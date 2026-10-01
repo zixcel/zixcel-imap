@@ -1,0 +1,10 @@
+schema = "zixcel://imap/config/v1"
+config_id = "operations-mail"
+account_ref = "mailbox:operations"
+secret_ref = "secret://imap/operations/observer"
+server = "imap.example.invalid"
+port = 993
+tls_mode = "implicit-tls"
+content_policy = "headers-only"
+mailboxes = ["INBOX", "Reports"]
+
