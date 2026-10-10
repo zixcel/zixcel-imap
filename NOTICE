@@ -5,3 +5,6 @@ The current distribution is offered under Apache-2.0.
 Previously granted permissions are not revoked. Existing third-party
 notices and any earlier license files remain applicable to their portions.
 External dependencies and service trademarks are not relicensed by this work.
+
+IMAP runtime: selected IMAP-curator logic under runtime/, MIT notice retained
+in runtime/LICENSE. The root Apache-2.0 notice does not replace it.
