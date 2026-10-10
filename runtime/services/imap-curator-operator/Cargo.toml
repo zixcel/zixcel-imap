@@ -1,0 +1,22 @@
+[package]
+publish = false
+name = "imap-curator-operator"
+version = "0.1.0"
+edition = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+anyhow = { workspace = true }
+checkback-core = { path = "../libs/checkback-core" }
+chrono = { workspace = true }
+clap = { workspace = true }
+db = { path = "../libs/db" }
+imap-curator-common = { path = "../libs/imap-curator-common" }
+observability = { path = "../libs/observability" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sqlx-core = { workspace = true }
+sqlx-postgres = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }

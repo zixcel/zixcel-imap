@@ -20,3 +20,43 @@ jobs:
         run: cargo +1.97 test --locked
       - name: Test all features
         run: cargo +1.97 test --locked --all-features
+
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: runtime
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: wonderland_test_imap
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      IMAP_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:5432/wonderland_test_imap
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install declared Rust toolchain
+        run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy
+      - name: Check formatting
+        run: cargo fmt --all --check
+      - name: Check all targets and features
+        run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+      - name: Test all runtime packages
+        run: cargo test --locked --workspace --all-features
+      - name: Verify disposable database migrations and tenant foreign keys
+        run: cargo run --locked -p db --example verify_postgres
+      - name: Build all runtime packages
+        run: cargo build --locked --workspace --all-features
+      - name: Install pinned dependency audit tool
+        run: cargo install cargo-audit --version 0.22.2 --locked
+      - name: Audit resolved dependencies
+        run: cargo audit --file Cargo.lock

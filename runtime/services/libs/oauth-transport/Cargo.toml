@@ -1,0 +1,10 @@
+[package]
+name = "oauth-transport"
+version = "0.1.0"
+publish = false
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+oauth2.workspace = true
+reqwest.workspace = true
