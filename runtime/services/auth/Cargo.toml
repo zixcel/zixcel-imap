@@ -6,6 +6,7 @@ edition = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+checkback-core = { path = "../libs/checkback-core" }
 oauth-transport = { path = "../libs/oauth-transport" }
 anyhow = { workspace = true }
 axum = { workspace = true }

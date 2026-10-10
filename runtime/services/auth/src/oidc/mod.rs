@@ -62,3 +62,18 @@ impl OidcClient {
         (url.to_string(), state, nonce, verifier)
     }
 }
+
+#[cfg(test)]
+pub(crate) fn browser_test_client() -> OidcClient {
+    OidcClient {
+        oauth: types::OAuthClient::new(
+            oauth2::ClientId::new("fixture-client".into()),
+            None,
+            oauth2::AuthUrl::new("https://example.invalid/authorize".into()).unwrap(),
+            None,
+        ),
+        issuer: "https://example.invalid".into(),
+        client_id: "fixture-client".into(),
+        keys: Vec::new(),
+    }
+}

@@ -14,7 +14,9 @@ use axum::routing::{delete, get, patch, post};
 use axum::{Json, Router};
 use checkback_core::RequestContext;
 use checkback_core::audit::{AuditRecord, write_audit_log};
-use checkback_core::auth::{SessionConfig, decode_session, read_session_cookie};
+use checkback_core::auth::{
+    SessionConfig, decode_session, read_session_cookie, session_cookie_name,
+};
 use checkback_core::tenant::{ensure_subject, resolve_tenant_for_subject};
 use chrono::{DateTime, Utc};
 use db::{DbConfig, connect_pool, migrate};
@@ -35,8 +37,6 @@ use utoipa::{IntoParams, OpenApi, ToSchema};
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::config::{Config, Mode};
-
-const SESSION_COOKIE_NAME: &str = "auth_session";
 
 #[derive(Debug, Serialize, ToSchema)]
 struct AccountsResponse {
@@ -777,7 +777,8 @@ fn build_cors_layer(origins: &[String]) -> Result<CorsLayer> {
             Method::DELETE,
             Method::OPTIONS,
         ])
-        .allow_headers([header::CONTENT_TYPE]))
+        .allow_headers([header::CONTENT_TYPE])
+        .allow_credentials(true))
 }
 
 async fn require_session(
@@ -785,7 +786,7 @@ async fn require_session(
     mut req: Request<Body>,
     next: Next,
 ) -> Result<Response, (StatusCode, Json<ApiError>)> {
-    let token = read_session_cookie(req.headers(), SESSION_COOKIE_NAME)
+    let token = read_session_cookie(req.headers(), session_cookie_name(&state.session.issuer))
         .ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "missing session"))?;
     let claims = decode_session(&token, &state.session)
         .map_err(|_| api_error(StatusCode::UNAUTHORIZED, "invalid session"))?;

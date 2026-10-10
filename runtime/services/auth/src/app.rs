@@ -102,7 +102,7 @@ struct ApiError {
 type AnyResult<T> = anyhow::Result<T>;
 type ApiResult<T> = std::result::Result<T, (StatusCode, Json<ApiError>)>;
 
-const SESSION_COOKIE_NAME: &str = "auth_session";
+use checkback_core::auth::{read_session_cookie as read_cookie, session_cookie_name};
 
 pub async fn run(config: Config) -> AnyResult<()> {
     let session_signing_key = required_trimmed("session_signing_key", &config.session_signing_key)?;
@@ -112,6 +112,10 @@ pub async fn run(config: Config) -> AnyResult<()> {
     );
 
     let public_base_url = normalize_base_url("public_base_url", &config.public_base_url)?;
+    ensure!(
+        config.cookie_secure == public_base_url.starts_with("https://"),
+        "HTTPS public URLs require --cookie-secure; insecure cookies are for loopback HTTP only"
+    );
     let redirect_url = format!(
         "{}{}",
         public_base_url,
@@ -124,6 +128,16 @@ pub async fn run(config: Config) -> AnyResult<()> {
         redirect_url,
     };
 
+    let scopes = parse_scopes(&config.scopes)?;
+    ensure!(
+        config.oidc_state_ttl_secs > 0
+            && config.oidc_max_pending_states > 0
+            && config.oidc_max_request_bytes > 0,
+        "OIDC request size, pending state lifetime and capacity must be positive"
+    );
+    let app_base_url = normalize_base_url("app_base_url", &config.app_base_url)?;
+    let post_login_path = normalize_path("post_login_path", &config.post_login_path)?;
+    let session_ttl = validate_session_ttl(config.session_ttl_secs)?;
     let client = match build_client(&oidc_config).await {
         Ok(client) => Some(Arc::new(client)),
         Err(err) => {
@@ -132,21 +146,16 @@ pub async fn run(config: Config) -> AnyResult<()> {
         }
     };
 
-    let scopes = parse_scopes(&config.scopes)?;
-    ensure!(
-        config.oidc_state_ttl_secs > 0 && config.oidc_max_pending_states > 0,
-        "OIDC pending state lifetime and capacity must be positive"
-    );
     let state = AppState {
         client: Arc::new(RwLock::new(client)),
         pending: Arc::new(Mutex::new(HashMap::new())),
         scopes,
         state_ttl: Duration::from_secs(config.oidc_state_ttl_secs),
         max_pending_states: config.oidc_max_pending_states,
-        app_base_url: normalize_base_url("app_base_url", &config.app_base_url)?,
-        post_login_path: normalize_path("post_login_path", &config.post_login_path)?,
+        app_base_url,
+        post_login_path,
         session_issuer: public_base_url,
-        session_ttl: validate_session_ttl(config.session_ttl_secs)?,
+        session_ttl,
         session_encoding_key: Arc::new(EncodingKey::from_secret(session_signing_key.as_bytes())),
         session_decoding_key: Arc::new(DecodingKey::from_secret(session_signing_key.as_bytes())),
         cookie_secure: config.cookie_secure,
@@ -179,6 +188,9 @@ pub async fn run(config: Config) -> AnyResult<()> {
         .route("/oauth/oidc/callback", get(oidc_callback))
         .route("/api/session", get(get_session))
         .route("/api/logout", post(logout))
+        .layer(axum::extract::DefaultBodyLimit::max(
+            config.oidc_max_request_bytes,
+        ))
         .layer(observability::http_trace_layer::<axum::body::Body>())
         .layer(cors)
         .with_state(state);
@@ -201,11 +213,18 @@ async fn health() -> Json<HealthResponse> {
 async fn oidc_authorize(
     State(state): State<AppState>,
     Json(payload): Json<AuthorizeRequest>,
-) -> ApiResult<Json<AuthorizeResponse>> {
+) -> ApiResult<axum::response::Response> {
     let client = get_client(&state).await?;
     let (auth_url, csrf_token, nonce, pkce_verifier) = client.authorization_url(&state.scopes);
     let state_key = csrf_token.secret().to_string();
-    let return_to = sanitize_return_to(payload.return_to);
+    let return_to = crate::browser::return_path(payload.return_to);
+    let state_cookie = crate::browser::cookie(&state_key, state.state_ttl, state.cookie_secure)
+        .map_err(|_| {
+            api_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "transaction cookie invalid",
+            )
+        })?;
 
     let mut pending = state
         .pending
@@ -228,14 +247,20 @@ async fn oidc_authorize(
         },
     );
 
-    Ok(Json(AuthorizeResponse {
-        authorize_url: auth_url.to_string(),
-    }))
+    let mut response = Json(AuthorizeResponse {
+        authorize_url: auth_url,
+    })
+    .into_response();
+    response
+        .headers_mut()
+        .insert(header::SET_COOKIE, state_cookie);
+    Ok(response)
 }
 
 async fn oidc_callback(
     State(state): State<AppState>,
     Query(params): Query<CallbackQuery>,
+    headers: axum::http::HeaderMap,
 ) -> ApiResult<impl IntoResponse> {
     if params.error.is_some() {
         return Err(api_error(
@@ -250,6 +275,12 @@ async fn oidc_callback(
     let state_token = params
         .state
         .ok_or_else(|| api_error(StatusCode::BAD_REQUEST, "missing oauth state"))?;
+    if !crate::browser::matches(&headers, &state_token, state.cookie_secure) {
+        return Err(api_error(
+            StatusCode::BAD_REQUEST,
+            "authorization browser state mismatch",
+        ));
+    }
     let pending = {
         let mut guard = state
             .pending
@@ -307,6 +338,14 @@ async fn oidc_callback(
 
     let mut response = Redirect::to(&redirect_url).into_response();
     response.headers_mut().insert(header::SET_COOKIE, cookie);
+    let expired =
+        crate::browser::cookie("", Duration::ZERO, state.cookie_secure).map_err(|_| {
+            api_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "transaction cookie invalid",
+            )
+        })?;
+    response.headers_mut().append(header::SET_COOKIE, expired);
     Ok(response)
 }
 
@@ -314,7 +353,7 @@ async fn get_session(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
 ) -> ApiResult<Json<SessionResponse>> {
-    let token = read_cookie(&headers, SESSION_COOKIE_NAME)
+    let token = read_cookie(&headers, session_cookie_name(&state.session_issuer))
         .ok_or_else(|| api_error(StatusCode::UNAUTHORIZED, "missing session"))?;
     let validation = session_validation(&state.session_issuer);
     let data = decode::<SessionClaims>(&token, &state.session_decoding_key, &validation)
@@ -362,7 +401,9 @@ fn build_session_cookie(token: &str, ttl: Duration, secure: bool) -> ApiResult<H
     let max_age = ttl.as_secs();
     let mut cookie = format!(
         "{}={}; Path=/; HttpOnly; SameSite=Lax; Max-Age={}",
-        SESSION_COOKIE_NAME, token, max_age
+        session_cookie_name(if secure { "https://" } else { "http://" }),
+        token,
+        max_age
     );
     if secure {
         cookie.push_str("; Secure");
@@ -374,31 +415,13 @@ fn build_session_cookie(token: &str, ttl: Duration, secure: bool) -> ApiResult<H
 fn build_expired_cookie(secure: bool) -> ApiResult<HeaderValue> {
     let mut cookie = format!(
         "{}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0",
-        SESSION_COOKIE_NAME
+        session_cookie_name(if secure { "https://" } else { "http://" })
     );
     if secure {
         cookie.push_str("; Secure");
     }
     HeaderValue::from_str(&cookie)
         .map_err(|_| api_error(StatusCode::INTERNAL_SERVER_ERROR, "cookie header invalid"))
-}
-
-fn read_cookie(headers: &axum::http::HeaderMap, name: &str) -> Option<String> {
-    let cookie_header = headers.get(header::COOKIE)?.to_str().ok()?;
-    cookie_header.split(';').find_map(|part| {
-        let part = part.trim();
-        part.strip_prefix(&format!("{}=", name))
-            .map(|value| value.to_string())
-    })
-}
-
-fn sanitize_return_to(value: Option<String>) -> Option<String> {
-    let value = value?.trim().to_string();
-    if value.starts_with('/') && !value.starts_with("//") {
-        Some(value)
-    } else {
-        None
-    }
 }
 
 fn normalize_path(label: &str, value: &str) -> AnyResult<String> {
@@ -408,7 +431,11 @@ fn normalize_path(label: &str, value: &str) -> AnyResult<String> {
     } else {
         format!("/{}", value)
     };
-    ensure!(!path.starts_with("//"), "{} must be a relative path", label);
+    ensure!(
+        crate::browser::return_path(Some(path.clone())).is_some(),
+        "{} must be a safe local path",
+        label
+    );
     Ok(path)
 }
 
@@ -431,6 +458,21 @@ fn parse_scopes(scopes: &str) -> AnyResult<Vec<Scope>> {
 fn normalize_base_url(label: &str, value: &str) -> AnyResult<String> {
     let value = required_trimmed(label, value)?;
     let value = value.trim_end_matches('/');
+    let parsed = oauth2::AuthUrl::new(value.to_owned()).context("invalid application base URL")?;
+    let url = parsed.url();
+    ensure!(
+        url.username().is_empty()
+            && url.password().is_none()
+            && url.query().is_none()
+            && url.fragment().is_none(),
+        "application base URL must not contain credentials, query or fragment"
+    );
+    if url.scheme() == "http" {
+        ensure!(
+            matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "[::1]")),
+            "HTTP application base URLs are restricted to loopback development"
+        );
+    }
     ensure!(
         value.starts_with("http://") || value.starts_with("https://"),
         "{} must start with http:// or https://",
@@ -500,3 +542,7 @@ fn api_error(status: StatusCode, message: impl Into<String>) -> (StatusCode, Jso
         }),
     )
 }
+
+#[cfg(test)]
+#[path = "browser_handler_tests/mod.rs"]
+mod browser_handler_tests;

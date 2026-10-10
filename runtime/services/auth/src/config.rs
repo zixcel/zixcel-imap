@@ -33,6 +33,9 @@ pub struct Config {
     /// Bound unauthenticated authorization requests retained in memory.
     #[arg(long, env = "OIDC_MAX_PENDING_STATES", default_value_t = 4096)]
     pub oidc_max_pending_states: usize,
+    /// Bound unauthenticated JSON requests before parsing and retaining return paths.
+    #[arg(long, env = "OIDC_MAX_REQUEST_BYTES", default_value_t = 4096)]
+    pub oidc_max_request_bytes: usize,
     #[arg(long, env = "AUTH_SESSION_KEY")]
     pub session_signing_key: String,
     #[arg(long, default_value_t = 3600)]
