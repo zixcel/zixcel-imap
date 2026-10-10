@@ -137,6 +137,7 @@ dependencies = [
  "aws-lc-rs",
  "axum",
  "base64 0.22.1",
+ "checkback-core",
  "chrono",
  "clap",
  "jsonwebtoken",

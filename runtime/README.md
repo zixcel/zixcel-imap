@@ -78,3 +78,36 @@ TLS is established explicitly before reading the greeting. Production server
 compatibility remains a deployment gate. OpenAPI generation uses utoipa 5 and
 Swagger UI 8 to remove the unmaintained proc-macro-error dependency while keeping
 the runtime's current Axum 0.7 API.
+
+The browser session flow requires the browser itself to call `/api/oidc/authorize`
+with cookies enabled (`credentials: "include"` for cross-origin fetch within the
+configured CORS allowlist). The response sets a single-use transaction cookie;
+the callback rejects missing, duplicate or mismatched browser state before code
+exchange. A successful callback clears the transaction cookie. Use
+`--cookie-secure` for HTTPS deployment to enforce the `__Host-` cookie boundary.
+Only one pending login per browser cookie is supported. Server-side or CLI calls
+cannot transfer this browser session flow without its originating browser cookie.
+Backslashes, control characters and authority-like return paths are rejected.
+
+HTTPS session issuers use `__Host-auth_session`; both auth services share the
+same cookie-name selection and reject duplicate session cookies. Production
+public URLs require HTTPS and `--cookie-secure`. Plain HTTP is restricted to
+loopback development and uses `auth_session`; HTTPS readers never fall back to
+that unprefixed cookie. Application base URLs reject credentials, queries and
+fragments. Set the helper's session issuer to the auth service's public base URL.
+
+Unauthenticated authorization JSON bodies are bounded before parsing by positive
+`OIDC_MAX_REQUEST_BYTES` (default 4096), preventing large return paths from
+exhausting the pending-state store. URL, session and request/state-limit configuration is validated before provider
+discovery.
+
+HTTPS deployment requires a new login if a browser still holds the old unprefixed
+`auth_session` cookie. The reader never accepts it as a fallback for an HTTPS issuer.
+Cookie-authenticated helper requests require an explicit CORS allowlist; wildcard
+origins do not support browser credentials.
+
+The auth and account-helper endpoints must share the browser-facing hostname,
+for example through reverse-proxy routes: host-prefixed cookies are not shared
+across subdomains. Frontends using cookie-based fetch must also be same-site
+and listed explicitly in CORS. Cross-site frontend federation is outside this
+local browser-session profile.
