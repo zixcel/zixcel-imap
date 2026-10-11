@@ -1,4 +1,4 @@
-use std::fs;
+mod config_io;
 use std::process::ExitCode;
 
 use serde::Serialize;
@@ -68,8 +68,7 @@ fn expect_no_more(arguments: &mut impl Iterator<Item = String>) -> Result<(), St
 }
 
 fn read_config(path: &str) -> Result<String, String> {
-    fs::read_to_string(path)
-        .map_err(|_| "configuration file could not be read as UTF-8 text".to_owned())
+    config_io::read_config(std::path::Path::new(path))
 }
 
 fn print_json(value: &impl Serialize) -> Result<(), String> {
