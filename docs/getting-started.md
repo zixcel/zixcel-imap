@@ -24,3 +24,5 @@ A passing source-level check establishes only what that check observes. Keep mis
 ## Continue reading
 
 [Repository overview](../README.md)
+
+Configuration input is limited to 1 MiB before decoding. The opened handle must be a regular file. On Unix, symbolic links and FIFOs are rejected with non-following, non-blocking open flags; the CLI does not wait for a FIFO writer. Invalid UTF-8 and oversized files are rejected.
