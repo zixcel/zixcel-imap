@@ -306,7 +306,6 @@ pub async fn run(config: Config) -> Result<()> {
     }
     let pool = connect_pool(&DbConfig::from_url_env(database_url)?).await?;
     migrate(&pool).await?;
-    migrate_secrets(&pool, openbao.as_ref()).await?;
 
     match config.mode {
         Mode::Once => {
@@ -383,196 +382,34 @@ async fn run_web(
 }
 
 #[tracing::instrument(skip(pool, openbao))]
-async fn migrate_secrets(
-    pool: &sqlx_postgres::PgPool,
-    openbao: Option<&OpenBaoClient>,
-) -> Result<()> {
-    let Some(openbao) = openbao else {
-        return Ok(());
-    };
-    let rows = sqlx_core::query::query(
-        r#"
-        SELECT
-            tenant_id,
-            account_id,
-            client_secret,
-            client_secret_ref,
-            refresh_token,
-            refresh_token_ref,
-            access_token,
-            access_token_ref,
-            app_password,
-            app_password_ref
-        FROM account_auth
-        "#,
-    )
-    .fetch_all(pool)
-    .await?;
-
-    for row in rows {
-        let tenant_id: String = row.get("tenant_id");
-        let account_id: String = row.get("account_id");
-        let client_secret: Option<String> = row.try_get("client_secret")?;
-        let client_secret_ref: Option<String> = row.try_get("client_secret_ref")?;
-        let refresh_token: Option<String> = row.try_get("refresh_token")?;
-        let refresh_token_ref: Option<String> = row.try_get("refresh_token_ref")?;
-        let access_token: Option<String> = row.try_get("access_token")?;
-        let access_token_ref: Option<String> = row.try_get("access_token_ref")?;
-        let app_password: Option<String> = row.try_get("app_password")?;
-        let app_password_ref: Option<String> = row.try_get("app_password_ref")?;
-
-        if client_secret_ref.is_none()
-            && let Some(value) = client_secret
-        {
-            let reference = openbao_secret_ref(&tenant_id, &account_id, "client_secret");
-            openbao.write_value(&reference, &value).await?;
-            sqlx_core::query::query(
-                    "UPDATE account_auth SET client_secret = NULL, client_secret_ref = $1 WHERE tenant_id = $2 AND account_id = $3",
-                )
-                .bind(&reference)
-                .bind(&tenant_id)
-                .bind(&account_id)
-                .execute(pool)
-                .await?;
-        }
-
-        if refresh_token_ref.is_none()
-            && let Some(value) = refresh_token
-        {
-            let reference = openbao_secret_ref(&tenant_id, &account_id, "refresh_token");
-            openbao.write_value(&reference, &value).await?;
-            sqlx_core::query::query(
-                    "UPDATE account_auth SET refresh_token = NULL, refresh_token_ref = $1 WHERE tenant_id = $2 AND account_id = $3",
-                )
-                .bind(&reference)
-                .bind(&tenant_id)
-                .bind(&account_id)
-                .execute(pool)
-                .await?;
-        }
-
-        if access_token_ref.is_none()
-            && let Some(value) = access_token
-        {
-            let reference = openbao_secret_ref(&tenant_id, &account_id, "access_token");
-            openbao.write_value(&reference, &value).await?;
-            sqlx_core::query::query(
-                    "UPDATE account_auth SET access_token = NULL, access_token_ref = $1 WHERE tenant_id = $2 AND account_id = $3",
-                )
-                .bind(&reference)
-                .bind(&tenant_id)
-                .bind(&account_id)
-                .execute(pool)
-                .await?;
-        }
-
-        if app_password_ref.is_none()
-            && let Some(value) = app_password
-        {
-            let reference = openbao_secret_ref(&tenant_id, &account_id, "app_password");
-            openbao.write_value(&reference, &value).await?;
-            sqlx_core::query::query(
-                    "UPDATE account_auth SET app_password = NULL, app_password_ref = $1 WHERE tenant_id = $2 AND account_id = $3",
-                )
-                .bind(&reference)
-                .bind(&tenant_id)
-                .bind(&account_id)
-                .execute(pool)
-                .await?;
-        }
-    }
-
-    Ok(())
-}
-
-#[tracing::instrument(skip(pool, openbao))]
 async fn refresh_access_tokens(
     pool: &sqlx_postgres::PgPool,
     openbao: Option<&OpenBaoClient>,
 ) -> Result<()> {
     let rows = sqlx_core::query::query(
-        r#"
-        SELECT
-            tenant_id,
-            account_id,
-            oauth_tenant_id,
-            client_id,
-            client_secret,
-            client_secret_ref,
-            refresh_token,
-            refresh_token_ref,
-            access_token_ref,
-            scope
-        FROM account_auth
-        WHERE auth_type = 'xoauth2' AND (refresh_token IS NOT NULL OR refresh_token_ref IS NOT NULL)
-        "#,
+        r#"SELECT auth.tenant_id, auth.account_id, auth.oauth_tenant_id, auth.client_id,
+                  auth.client_secret_ref, auth.refresh_token_ref, auth.access_token_ref, auth.scope
+           FROM account_auth auth
+           JOIN accounts a ON a.tenant_id = auth.tenant_id AND a.account_id = auth.account_id
+           WHERE a.enabled AND auth.auth_type = 'xoauth2' AND auth.refresh_token_ref IS NOT NULL"#,
     )
     .fetch_all(pool)
     .await?;
-
+    if rows.is_empty() {
+        return Ok(());
+    }
+    let client = openbao.context("OpenBao not configured for token refresh")?;
     for row in rows {
         let tenant_id: String = row.get("tenant_id");
         let account_id: String = row.get("account_id");
-        let oauth_tenant_id: Option<String> = row.try_get("oauth_tenant_id")?;
-        let client_id: Option<String> = row.try_get("client_id")?;
-        let mut client_secret: Option<String> = row.try_get("client_secret")?;
-        let mut client_secret_ref: Option<String> = row.try_get("client_secret_ref")?;
-        let mut refresh_token: Option<String> = row.try_get("refresh_token")?;
-        let mut refresh_token_ref: Option<String> = row.try_get("refresh_token_ref")?;
-        let access_token_ref: Option<String> = row.try_get("access_token_ref")?;
+        let oauth_tenant_id: String = row.try_get("oauth_tenant_id")?;
+        let client_id: String = row.try_get("client_id")?;
+        let client_secret_ref: String = row.try_get("client_secret_ref")?;
+        let refresh_token_ref: String = row.try_get("refresh_token_ref")?;
+        let access_token_ref: String = row.try_get("access_token_ref")?;
         let scope: Option<String> = row.try_get("scope")?;
-
-        if let Some(openbao) = openbao {
-            if client_secret_ref.is_none()
-                && let Some(value) = client_secret.as_deref()
-            {
-                let reference = openbao_secret_ref(&tenant_id, &account_id, "client_secret");
-                openbao.write_value(&reference, value).await?;
-                sqlx_core::query::query(
-                        "UPDATE account_auth SET client_secret = NULL, client_secret_ref = $1 WHERE tenant_id = $2 AND account_id = $3",
-                    )
-                    .bind(&reference)
-                    .bind(&tenant_id)
-                    .bind(&account_id)
-                    .execute(pool)
-                    .await?;
-                client_secret_ref = Some(reference);
-                client_secret = None;
-            }
-            if refresh_token_ref.is_none()
-                && let Some(value) = refresh_token.as_deref()
-            {
-                let reference = openbao_secret_ref(&tenant_id, &account_id, "refresh_token");
-                openbao.write_value(&reference, value).await?;
-                sqlx_core::query::query(
-                        "UPDATE account_auth SET refresh_token = NULL, refresh_token_ref = $1 WHERE tenant_id = $2 AND account_id = $3",
-                    )
-                    .bind(&reference)
-                    .bind(&tenant_id)
-                    .bind(&account_id)
-                    .execute(pool)
-                    .await?;
-                refresh_token_ref = Some(reference);
-                refresh_token = None;
-            }
-        }
-
-        let oauth_tenant_id = oauth_tenant_id.context("missing oauth_tenant_id")?;
-        let client_id = client_id.context("missing client_id")?;
-        let client_secret = resolve_secret(
-            openbao,
-            client_secret,
-            client_secret_ref.as_deref(),
-            "client_secret",
-        )
-        .await?;
-        let refresh_token = resolve_secret(
-            openbao,
-            refresh_token,
-            refresh_token_ref.as_deref(),
-            "refresh_token",
-        )
-        .await?;
+        let client_secret = client.read_value(&client_secret_ref).await?;
+        let refresh_token = client.read_value(&refresh_token_ref).await?;
         let access_token = fetch_access_token(
             &oauth_tenant_id,
             &client_id,
@@ -581,30 +418,15 @@ async fn refresh_access_tokens(
             scope.as_deref(),
         )
         .await?;
-        if let Some(openbao) = openbao {
-            let access_ref = access_token_ref
-                .unwrap_or_else(|| openbao_secret_ref(&tenant_id, &account_id, "access_token"));
-            openbao.write_value(&access_ref, &access_token).await?;
-            sqlx_core::query::query(
-                "UPDATE account_auth SET access_token = NULL, access_token_ref = $1, updated_at = now() WHERE tenant_id = $2 AND account_id = $3",
-            )
-            .bind(access_ref)
-            .bind(&tenant_id)
-            .bind(&account_id)
-            .execute(pool)
-            .await?;
-        } else {
-            sqlx_core::query::query(
-                "UPDATE account_auth SET access_token = $1, updated_at = now() WHERE tenant_id = $2 AND account_id = $3",
-            )
-            .bind(access_token)
-            .bind(&tenant_id)
-            .bind(&account_id)
-            .execute(pool)
-            .await?;
-        }
+        client.write_value(&access_token_ref, &access_token).await?;
+        sqlx_core::query::query(
+            "UPDATE account_auth SET updated_at = now() WHERE tenant_id = $1 AND account_id = $2",
+        )
+        .bind(&tenant_id)
+        .bind(&account_id)
+        .execute(pool)
+        .await?;
     }
-
     Ok(())
 }
 
@@ -680,32 +502,22 @@ fn truncate_body(body: &str) -> String {
     }
 }
 
-fn openbao_secret_ref(tenant_id: &str, account_id: &str, key: &str) -> String {
-    format!(
+fn openbao_secret_ref(tenant_id: &str, account_id: &str, key: &str) -> Result<String> {
+    for identity in [tenant_id, account_id, key] {
+        anyhow::ensure!(
+            (1..=256).contains(&identity.len())
+                && !identity.contains("..")
+                && identity.as_bytes()[0].is_ascii_alphanumeric()
+                && identity
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-')),
+            "invalid secret namespace identity"
+        );
+    }
+    Ok(format!(
         "secret/imap-curator/tenants/{}/accounts/{}/{}",
         tenant_id, account_id, key
-    )
-}
-
-async fn resolve_secret(
-    openbao: Option<&OpenBaoClient>,
-    value: Option<String>,
-    reference: Option<&str>,
-    label: &str,
-) -> Result<String> {
-    if let Some(value) = value {
-        return Ok(value);
-    }
-    if let Some(reference) = reference {
-        if let Some(openbao) = openbao {
-            return openbao
-                .read_value(reference)
-                .await
-                .with_context(|| format!("openbao read {}", label));
-        }
-        anyhow::bail!("OpenBao not configured for {}", label);
-    }
-    anyhow::bail!("missing {}", label);
+    ))
 }
 
 async fn store_secret(
@@ -714,14 +526,11 @@ async fn store_secret(
     account_id: &str,
     key: &str,
     value: &str,
-) -> Result<(Option<String>, Option<String>)> {
-    if let Some(openbao) = openbao {
-        let reference = openbao_secret_ref(tenant_id, account_id, key);
-        openbao.write_value(&reference, value).await?;
-        Ok((None, Some(reference)))
-    } else {
-        Ok((Some(value.to_string()), None))
-    }
+) -> Result<String> {
+    let client = openbao.context("OpenBao not configured for secret storage")?;
+    let reference = openbao_secret_ref(tenant_id, account_id, key)?;
+    client.write_value(&reference, value).await?;
+    Ok(reference)
 }
 
 #[derive(Clone)]
@@ -1862,7 +1671,8 @@ async fn upsert_ms365_account(
     form: &Ms365AuthorizeRequest,
     refresh_token: &str,
 ) -> Result<()> {
-    let enabled = form.enabled.unwrap_or(true);
+    let openbao = Some(openbao.context("OpenBao not configured for account secret storage")?);
+    let enabled = form.enabled.unwrap_or(false);
     let imap_host = form
         .imap_host
         .clone()
@@ -1877,7 +1687,7 @@ async fn upsert_ms365_account(
     )
     .await?;
 
-    let (client_secret, client_secret_ref) = store_secret(
+    let client_secret_ref = store_secret(
         openbao,
         &context.tenant_id,
         &form.account_id,
@@ -1885,7 +1695,7 @@ async fn upsert_ms365_account(
         &form.client_secret,
     )
     .await?;
-    let (refresh_token, refresh_token_ref) = store_secret(
+    let refresh_token_ref = store_secret(
         openbao,
         &context.tenant_id,
         &form.account_id,
@@ -1893,7 +1703,7 @@ async fn upsert_ms365_account(
         refresh_token,
     )
     .await?;
-    let (access_token, access_token_ref) = store_secret(
+    let access_token_ref = store_secret(
         openbao,
         &context.tenant_id,
         &form.account_id,
@@ -1983,26 +1793,20 @@ async fn upsert_ms365_account(
                 username,
                 oauth_tenant_id,
                 client_id,
-                client_secret,
                 client_secret_ref,
-                refresh_token,
                 refresh_token_ref,
                 scope,
-                access_token,
                 access_token_ref
             )
-        VALUES ($1, $2, 'xoauth2', $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        VALUES ($1, $2, 'xoauth2', $3, $4, $5, $6, $7, $8, $9)
         ON CONFLICT (tenant_id, account_id) DO UPDATE SET
             auth_type = EXCLUDED.auth_type,
             username = EXCLUDED.username,
             oauth_tenant_id = EXCLUDED.oauth_tenant_id,
             client_id = EXCLUDED.client_id,
-            client_secret = EXCLUDED.client_secret,
             client_secret_ref = EXCLUDED.client_secret_ref,
-            refresh_token = EXCLUDED.refresh_token,
             refresh_token_ref = EXCLUDED.refresh_token_ref,
             scope = EXCLUDED.scope,
-            access_token = EXCLUDED.access_token,
             access_token_ref = EXCLUDED.access_token_ref,
             updated_at = now()
         "#,
@@ -2012,12 +1816,9 @@ async fn upsert_ms365_account(
     .bind(&form.username)
     .bind(&form.tenant_id)
     .bind(&form.client_id)
-    .bind(client_secret)
     .bind(client_secret_ref)
-    .bind(refresh_token)
     .bind(refresh_token_ref)
     .bind(&form.scope)
-    .bind(access_token)
     .bind(access_token_ref)
     .execute(&mut *tx)
     .await?;
@@ -2050,7 +1851,8 @@ async fn upsert_icloud_account(
     context: &RequestContext,
     form: &IcloudUpsertRequest,
 ) -> Result<()> {
-    let enabled = form.enabled.unwrap_or(true);
+    let openbao = Some(openbao.context("OpenBao not configured for account secret storage")?);
+    let enabled = form.enabled.unwrap_or(false);
     let imap_host = form
         .imap_host
         .clone()
@@ -2058,7 +1860,7 @@ async fn upsert_icloud_account(
     let imap_port = form.imap_port.unwrap_or(993);
     let username = form.username.trim().to_string();
     let app_password = form.app_password.replace(char::is_whitespace, "");
-    let (app_password, app_password_ref) = store_secret(
+    let app_password_ref = store_secret(
         openbao,
         &context.tenant_id,
         &form.account_id,
@@ -2140,12 +1942,11 @@ async fn upsert_icloud_account(
 
     sqlx_core::query::query(
         r#"
-        INSERT INTO account_auth (tenant_id, account_id, auth_type, username, app_password, app_password_ref)
-        VALUES ($1, $2, 'password', $3, $4, $5)
+        INSERT INTO account_auth (tenant_id, account_id, auth_type, username, app_password_ref)
+        VALUES ($1, $2, 'password', $3, $4)
         ON CONFLICT (tenant_id, account_id) DO UPDATE SET
             auth_type = EXCLUDED.auth_type,
             username = EXCLUDED.username,
-            app_password = EXCLUDED.app_password,
             app_password_ref = EXCLUDED.app_password_ref,
             updated_at = now()
         "#,
@@ -2153,7 +1954,6 @@ async fn upsert_icloud_account(
     .bind(&context.tenant_id)
     .bind(&form.account_id)
     .bind(&username)
-    .bind(&app_password)
     .bind(app_password_ref)
     .execute(&mut *tx)
     .await?;
@@ -2214,6 +2014,37 @@ fn oauth_redirect_url(public_base_url: &str) -> Result<RedirectUrl> {
 mod tests {
     use super::*;
     use clap::{CommandFactory, Parser};
+
+    #[test]
+    fn secret_namespace_identity_cannot_escape_its_tenant() {
+        for identity in [
+            "",
+            "../other",
+            "other/account",
+            "..",
+            "fixture\nother",
+            "%2fother",
+            " fixture",
+        ] {
+            assert!(openbao_secret_ref(identity, "fixture-account", "access_token").is_err());
+            assert!(openbao_secret_ref("fixture-a", identity, "access_token").is_err());
+        }
+    }
+
+    #[tokio::test]
+    async fn secret_storage_requires_the_provider() {
+        assert!(
+            store_secret(
+                None,
+                "fixture-a",
+                "fixture-account",
+                "access_token",
+                "synthetic"
+            )
+            .await
+            .is_err()
+        );
+    }
 
     #[test]
     fn cli_requires_explicit_session_key_and_defaults_to_loopback() {
