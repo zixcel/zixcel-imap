@@ -1,0 +1,345 @@
+{
+  "repository": "zixcel/zixcel-imap",
+  "purpose": "Check a IMAP mail integration configuration and produce a plan before implementing or enabling the connection.",
+  "responsibility_boundary": "Own the named reusable integration/data mechanism. Product roles/UI and operational approvals stay with consumers; transport/custody reuse managed Crowsi components where capabilities fit. Planning-only APIs must remain clearly distinguished from implemented external operations.",
+  "packages": [
+    {
+      "manifest": "Cargo.toml",
+      "package": "zixcel-imap",
+      "ecosystem": "rust",
+      "description": "Planning-only IMAP connector boundary for Zixcel",
+      "interfaces": {
+        "lib": "src/lib.rs",
+        "features": {},
+        "bins": [],
+        "public_modules": [],
+        "public_reexports": [
+          "boundary::ConnectorError",
+          "config::{ConnectorConfig, ContentPolicy, TlsMode, parse_config}",
+          "plan::{ConnectorPlan, PlanStep, build_plan}",
+          "reports::{\n    CapabilityReport, DoctorReport, ValidationReport, capabilities, doctor, validation_report,\n}"
+        ],
+        "implicit_bins": []
+      },
+      "declared_commands": {}
+    },
+    {
+      "manifest": "runtime/services/auth/Cargo.toml",
+      "package": "auth",
+      "ecosystem": "rust",
+      "description": null,
+      "interfaces": {
+        "lib": null,
+        "features": {},
+        "bins": [],
+        "implicit_bins": []
+      },
+      "declared_commands": {}
+    },
+    {
+      "manifest": "runtime/services/imap-curator-auth-helper/Cargo.toml",
+      "package": "imap-curator-auth-helper",
+      "ecosystem": "rust",
+      "description": null,
+      "interfaces": {
+        "lib": null,
+        "features": {},
+        "bins": [],
+        "implicit_bins": []
+      },
+      "declared_commands": {}
+    },
+    {
+      "manifest": "runtime/services/imap-curator-collector/Cargo.toml",
+      "package": "imap-curator-collector",
+      "ecosystem": "rust",
+      "description": null,
+      "interfaces": {
+        "lib": null,
+        "features": {},
+        "bins": [],
+        "implicit_bins": []
+      },
+      "declared_commands": {}
+    },
+    {
+      "manifest": "runtime/services/imap-curator-operator/Cargo.toml",
+      "package": "imap-curator-operator",
+      "ecosystem": "rust",
+      "description": null,
+      "interfaces": {
+        "lib": null,
+        "features": {},
+        "bins": [],
+        "implicit_bins": []
+      },
+      "declared_commands": {}
+    },
+    {
+      "manifest": "runtime/services/libs/checkback-core/Cargo.toml",
+      "package": "checkback-core",
+      "ecosystem": "rust",
+      "description": null,
+      "interfaces": {
+        "lib": "runtime/services/libs/checkback-core/src/lib.rs",
+        "features": {},
+        "bins": [],
+        "public_modules": [
+          "audit",
+          "auth",
+          "context",
+          "tenant"
+        ],
+        "public_reexports": [
+          "context::RequestContext"
+        ],
+        "implicit_bins": []
+      },
+      "declared_commands": {}
+    },
+    {
+      "manifest": "runtime/services/libs/db/Cargo.toml",
+      "package": "db",
+      "ecosystem": "rust",
+      "description": null,
+      "interfaces": {
+        "lib": "runtime/services/libs/db/src/lib.rs",
+        "features": {},
+        "bins": [],
+        "public_modules": [],
+        "public_reexports": [],
+        "implicit_bins": []
+      },
+      "declared_commands": {}
+    },
+    {
+      "manifest": "runtime/services/libs/imap-curator-common/Cargo.toml",
+      "package": "imap-curator-common",
+      "ecosystem": "rust",
+      "description": null,
+      "interfaces": {
+        "lib": "runtime/services/libs/imap-curator-common/src/lib.rs",
+        "features": {},
+        "bins": [],
+        "public_modules": [
+          "accounts",
+          "db",
+          "domains",
+          "imap_client",
+          "openbao"
+        ],
+        "public_reexports": [],
+        "implicit_bins": []
+      },
+      "declared_commands": {}
+    },
+    {
+      "manifest": "runtime/services/libs/oauth-transport/Cargo.toml",
+      "package": "oauth-transport",
+      "ecosystem": "rust",
+      "description": null,
+      "interfaces": {
+        "lib": "runtime/services/libs/oauth-transport/src/lib.rs",
+        "features": {},
+        "bins": [],
+        "public_modules": [],
+        "public_reexports": [],
+        "implicit_bins": []
+      },
+      "declared_commands": {}
+    },
+    {
+      "manifest": "runtime/services/libs/observability/Cargo.toml",
+      "package": "observability",
+      "ecosystem": "rust",
+      "description": null,
+      "interfaces": {
+        "lib": "runtime/services/libs/observability/src/lib.rs",
+        "features": {},
+        "bins": [],
+        "public_modules": [],
+        "public_reexports": [],
+        "implicit_bins": []
+      },
+      "declared_commands": {}
+    }
+  ],
+  "schema_definitions": [],
+  "test_sources": [
+    "runtime/services/auth/src/app.rs",
+    "runtime/services/auth/src/browser.rs",
+    "runtime/services/auth/src/browser_handler_tests/mod.rs",
+    "runtime/services/auth/src/browser_handler_tests/session.rs",
+    "runtime/services/auth/src/browser_tests.rs",
+    "runtime/services/auth/src/main.rs",
+    "runtime/services/auth/src/oidc/discovery.rs",
+    "runtime/services/auth/src/oidc/tests/authorization.rs",
+    "runtime/services/auth/src/oidc/tests/discovery.rs",
+    "runtime/services/auth/src/oidc/tests/fixture.rs",
+    "runtime/services/auth/src/oidc/tests/identity.rs",
+    "runtime/services/auth/src/oidc/tests/keys.rs",
+    "runtime/services/auth/src/oidc/tests/mod.rs",
+    "runtime/services/auth/src/oidc/verification.rs",
+    "runtime/services/imap-curator-auth-helper/src/app.rs",
+    "runtime/services/imap-curator-auth-helper/src/main.rs",
+    "runtime/services/imap-curator-collector/src/app.rs",
+    "runtime/services/imap-curator-collector/src/main.rs",
+    "runtime/services/imap-curator-operator/src/app.rs",
+    "runtime/services/imap-curator-operator/src/main.rs",
+    "runtime/services/libs/checkback-core/src/auth/cookie.rs",
+    "runtime/services/libs/checkback-core/src/auth/tests.rs",
+    "runtime/services/libs/checkback-core/src/tenant.rs",
+    "runtime/services/libs/db/examples/verify_postgres.rs",
+    "runtime/services/libs/db/src/lib.rs",
+    "runtime/services/libs/imap-curator-common/src/accounts.rs",
+    "runtime/services/libs/imap-curator-common/src/db.rs",
+    "runtime/services/libs/imap-curator-common/src/domains.rs",
+    "runtime/services/libs/imap-curator-common/src/imap_client.rs",
+    "runtime/services/libs/oauth-transport/src/lib.rs",
+    "runtime/services/libs/observability/src/lib.rs",
+    "src/boundary.rs",
+    "src/config_io.rs",
+    "src/unit_tests.rs",
+    "tests/connector.rs"
+  ],
+  "example_sources": [
+    "examples/config.toml",
+    "runtime/services/libs/db/examples/verify_postgres.rs"
+  ],
+  "workflow_definitions": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "jobs": [
+        {
+          "job": "test",
+          "condition": null,
+          "runs_on": "ubuntu-latest",
+          "steps": [
+            {
+              "name": null,
+              "run": null,
+              "uses": "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+              "condition": null
+            },
+            {
+              "name": "Install declared Rust toolchain",
+              "run": "rustup toolchain install 1.97 --profile minimal",
+              "uses": null,
+              "condition": null
+            },
+            {
+              "name": "Test default features",
+              "run": "cargo +1.97 test --locked",
+              "uses": null,
+              "condition": null
+            },
+            {
+              "name": "Test all features",
+              "run": "cargo +1.97 test --locked --all-features",
+              "uses": null,
+              "condition": null
+            }
+          ]
+        },
+        {
+          "job": "runtime",
+          "condition": null,
+          "runs_on": "ubuntu-latest",
+          "steps": [
+            {
+              "name": null,
+              "run": null,
+              "uses": "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+              "condition": null
+            },
+            {
+              "name": "Install declared Rust toolchain",
+              "run": "rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy",
+              "uses": null,
+              "condition": null
+            },
+            {
+              "name": "Check formatting",
+              "run": "cargo fmt --all --check",
+              "uses": null,
+              "condition": null
+            },
+            {
+              "name": "Check all targets and features",
+              "run": "cargo clippy --locked --workspace --all-targets --all-features -- -D warnings",
+              "uses": null,
+              "condition": null
+            },
+            {
+              "name": "Test all runtime packages",
+              "run": "cargo test --locked --workspace --all-features",
+              "uses": null,
+              "condition": null
+            },
+            {
+              "name": "Verify disposable database migrations and tenant foreign keys",
+              "run": "cargo run --locked -p db --example verify_postgres",
+              "uses": null,
+              "condition": null
+            },
+            {
+              "name": "Build all runtime packages",
+              "run": "cargo build --locked --workspace --all-features",
+              "uses": null,
+              "condition": null
+            },
+            {
+              "name": "Install pinned dependency audit tool",
+              "run": "cargo install cargo-audit --version 0.22.2 --locked",
+              "uses": null,
+              "condition": null
+            },
+            {
+              "name": "Audit resolved dependencies",
+              "run": "cargo audit --file Cargo.lock",
+              "uses": null,
+              "condition": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "path": ".github/workflows/oss-policy.yml",
+      "jobs": [
+        {
+          "job": "repository-policy",
+          "condition": null,
+          "runs_on": "ubuntu-latest",
+          "steps": [
+            {
+              "name": null,
+              "run": null,
+              "uses": "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+              "condition": null
+            },
+            {
+              "name": "Verify repository policy",
+              "run": "python3 .github/oss-policy-check.py",
+              "uses": null,
+              "condition": null
+            },
+            {
+              "name": "Verify policy regression tests",
+              "run": "cd .github && python3 -m unittest discover -s policy-tests",
+              "uses": null,
+              "condition": null
+            },
+            {
+              "name": "Check policy types",
+              "run": "python3 -m venv \"$RUNNER_TEMP/policy-types\"\n\"$RUNNER_TEMP/policy-types/bin/pip\" install -r .github/policy/requirements.txt\n\"$RUNNER_TEMP/policy-types/bin/mypy\" --strict .github/policy .github/oss-policy-check.py .github/policy-tests\n",
+              "uses": null,
+              "condition": null
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "evidence_policy": "Declarations and source paths are not proof of an executed acceptance. Exact CI head and result are recorded separately. No live accounts or production acceptance is inferred."
+}
