@@ -182,55 +182,7 @@ async fn handle_account(
 }
 
 async fn read_secret(openbao: Option<&OpenBaoClient>, auth: &AuthConfig) -> Result<String> {
-    match auth {
-        AuthConfig::Password {
-            password,
-            password_ref,
-            ..
-        } => {
-            resolve_secret(
-                openbao,
-                password.as_deref(),
-                password_ref.as_deref(),
-                "password",
-            )
-            .await
-        }
-        AuthConfig::Xoauth2 {
-            access_token,
-            access_token_ref,
-            ..
-        } => {
-            resolve_secret(
-                openbao,
-                access_token.as_deref(),
-                access_token_ref.as_deref(),
-                "access token",
-            )
-            .await
-        }
-    }
-}
-
-async fn resolve_secret(
-    openbao: Option<&OpenBaoClient>,
-    inline: Option<&str>,
-    reference: Option<&str>,
-    label: &str,
-) -> Result<String> {
-    if let Some(value) = inline {
-        return Ok(value.to_string());
-    }
-    if let Some(reference) = reference {
-        if let Some(openbao) = openbao {
-            return openbao
-                .read_value(reference)
-                .await
-                .with_context(|| format!("openbao read {}", label));
-        }
-        anyhow::bail!("OpenBao not configured for {}", label);
-    }
-    anyhow::bail!("missing {}", label);
+    imap_curator_common::accounts::read_auth_secret(openbao, auth).await
 }
 
 #[cfg(test)]
@@ -251,8 +203,7 @@ mod tests {
     async fn read_secret_requires_openbao_for_refs() {
         let auth = AuthConfig::Xoauth2 {
             username: "user@example.com".to_string(),
-            access_token_ref: Some("fallback".to_string()),
-            access_token: None,
+            access_token_ref: "secret/fixture/access".to_string(),
         };
         let err = read_secret(None, &auth).await.expect_err("missing openbao");
         assert!(format!("{err}").contains("OpenBao not configured"));

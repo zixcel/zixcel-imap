@@ -66,9 +66,7 @@ pub async fn load_account_conn(
             m.inbox,
             auth.auth_type,
             auth.username,
-            auth.access_token,
             auth.access_token_ref,
-            auth.app_password,
             auth.app_password_ref
         FROM accounts a
         JOIN account_imap i ON i.account_id = a.account_id AND i.tenant_id = a.tenant_id
@@ -89,12 +87,10 @@ pub async fn load_account_conn(
         "xoauth2" => AuthConfig::Xoauth2 {
             username,
             access_token_ref: row.try_get("access_token_ref")?,
-            access_token: row.try_get("access_token")?,
         },
         "password" => AuthConfig::Password {
             username,
             password_ref: row.try_get("app_password_ref")?,
-            password: row.try_get("app_password")?,
         },
         other => anyhow::bail!("unsupported auth_type: {}", other),
     };

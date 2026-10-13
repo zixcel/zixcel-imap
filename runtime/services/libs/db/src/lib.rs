@@ -73,7 +73,7 @@ pub async fn migrate(pool: &PgPool) -> Result<()> {
     Ok(())
 }
 
-/// Keep migrations embedded with their original bytes/checksums, without SQLx macros
+/// Embed the current fresh-development schema without legacy transitions, without SQLx macros
 /// that pull unrelated database drivers into the dependency graph.
 #[derive(Debug)]
 struct EmbeddedMigrations;
@@ -95,22 +95,13 @@ impl sqlx_core::migrate::MigrationSource<'static> for EmbeddedMigrations {
         Box::pin(async {
             use sqlx_core::migrate::{Migration, MigrationType};
             use std::borrow::Cow;
-            Ok(vec![
-                Migration::new(
-                    1,
-                    Cow::Borrowed("init"),
-                    MigrationType::Simple,
-                    Cow::Borrowed(include_str!("../migrations/0001_init.sql")),
-                    false,
-                ),
-                Migration::new(
-                    2,
-                    Cow::Borrowed("core"),
-                    MigrationType::Simple,
-                    Cow::Borrowed(include_str!("../migrations/0002_core.sql")),
-                    false,
-                ),
-            ])
+            Ok(vec![Migration::new(
+                1,
+                Cow::Borrowed("development baseline"),
+                MigrationType::Simple,
+                Cow::Borrowed(include_str!("../migrations/0001_development_baseline.sql")),
+                false,
+            )])
         })
     }
 }
