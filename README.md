@@ -33,3 +33,5 @@ The adopted [runtime](runtime/README.md) workspace owns the MIT-licensed
 collector, operator, account OAuth/session helpers, PostgreSQL migrations and
 telemetry. It is separate from the planning-only root crate and is unpublished.
 The connector runtime is not enabled automatically.
+
+[OSS responsibility and source completion](docs/oss-source-contract.md) defines the supported package boundary and required acceptance. It does not declare unexecuted source, distribution or production checks complete.
