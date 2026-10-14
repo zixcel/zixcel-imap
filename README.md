@@ -35,3 +35,5 @@ telemetry. It is separate from the planning-only root crate and is unpublished.
 The connector runtime is not enabled automatically.
 
 [OSS responsibility and source completion](docs/oss-source-contract.md) defines the supported package boundary and required acceptance. It does not declare unexecuted source, distribution or production checks complete.
+
+Dependency updates: [repository policy](docs/dependency-updates.md).
