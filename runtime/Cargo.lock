@@ -1265,7 +1265,7 @@ dependencies = [
  "serde_json",
  "sqlx-core",
  "sqlx-postgres",
- "thiserror 1.0.69",
+ "thiserror 2.0.21",
  "tokio",
  "tower-http 0.5.2",
  "tracing",
@@ -1288,7 +1288,7 @@ dependencies = [
  "serde_json",
  "sqlx-core",
  "sqlx-postgres",
- "thiserror 1.0.69",
+ "thiserror 2.0.21",
  "tokio",
  "tracing",
 ]
@@ -1307,7 +1307,7 @@ dependencies = [
  "serde_json",
  "sqlx-core",
  "sqlx-postgres",
- "thiserror 1.0.69",
+ "thiserror 2.0.21",
  "tokio",
  "tracing",
 ]
@@ -1327,7 +1327,7 @@ dependencies = [
  "serde_json",
  "sqlx-core",
  "sqlx-postgres",
- "thiserror 1.0.69",
+ "thiserror 2.0.21",
  "tokio",
  "tracing",
 ]
