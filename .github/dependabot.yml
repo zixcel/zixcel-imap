@@ -3,6 +3,7 @@ updates:
 - package-ecosystem: cargo
   directories:
   - /
+  - /runtime
   schedule:
     interval: weekly
     day: wednesday
