@@ -24,7 +24,7 @@ clap = { version = "4.5.21", features = ["derive", "env"] }
 http = "1.1.0"
 imap = "=3.0.0-alpha.15"
 jsonwebtoken = { version = "=10.4.0", default-features = false, features = ["use_pem", "aws_lc_rs"] }
-mailparse = "0.14.1"
+mailparse = "0.18.0"
 native-tls = "0.2.12"
 opentelemetry = "0.33.0"
 opentelemetry-otlp = { version = "0.33.0", default-features = false, features = ["trace", "grpc-tonic", "tls-ring", "tls-roots"] }
