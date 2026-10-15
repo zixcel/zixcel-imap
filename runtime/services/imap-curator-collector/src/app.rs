@@ -9,7 +9,7 @@ use db::{DbConfig, connect_pool};
 use imap_curator_common::accounts::AuthConfig;
 use imap_curator_common::db::{
     load_account_conn, load_accounts_index, load_domains_config, record_account_sync_status,
-    upsert_service_status, write_domains_config,
+    upsert_service_status, write_domains_config_in_transaction,
 };
 use imap_curator_common::domains::{
     Defaults, DomainsConfig, apply_domain_observation, ensure_account_entry,
@@ -122,6 +122,9 @@ async fn run_tenant(
 
     for entry in accounts {
         if let Err(err) = process_account(cli, pool, openbao, tenant_id, &mut config, entry).await {
+            config = load_domains_config(pool, tenant_id)
+                .await?
+                .context("reload durable collector state after account failure")?;
             let error_text = truncate_error(&format!("{:#}", err));
             record_account_sync_status(
                 pool,
@@ -205,6 +208,7 @@ async fn process_account(
         .collect();
 
     while next_uid <= highest_uid && batches < max_batches {
+        let mut batch_config = config.clone();
         let end_uid = (next_uid + batch_size - 1).min(highest_uid);
         let query = format!("UID {}:{}", next_uid, end_uid);
         let uids = session.uid_search(&query)?;
@@ -230,7 +234,8 @@ async fn process_account(
         }
 
         {
-            let account_entry = ensure_account_entry(config, &conn.account_id, &mailbox_name);
+            let account_entry =
+                ensure_account_entry(&mut batch_config, &conn.account_id, &mailbox_name);
             for header in headers {
                 let mut domains = Vec::new();
                 for from_value in &header.from {
@@ -285,7 +290,8 @@ async fn process_account(
         );
 
         {
-            let account_entry = ensure_account_entry(config, &conn.account_id, &mailbox_name);
+            let account_entry =
+                ensure_account_entry(&mut batch_config, &conn.account_id, &mailbox_name);
             account_entry.collector_state.last_uid_processed = end_uid;
         }
         next_uid = end_uid + 1;
@@ -299,17 +305,17 @@ async fn process_account(
                 "dry-run: skipped domains table update"
             );
         } else {
-            write_domains_config(pool, tenant_id, config).await?;
-            write_mail_messages(
+            persist_batch(
                 pool,
                 tenant_id,
                 &conn.account_id,
                 &mailbox_name,
                 now,
+                &batch_config,
                 &mail_messages,
             )
             .await?;
-            let domain_count = config
+            let domain_count = batch_config
                 .accounts
                 .get(&conn.account_id)
                 .map(|account| account.domains.len())
@@ -322,6 +328,7 @@ async fn process_account(
                 "domains config updated"
             );
         }
+        *config = batch_config;
     }
 
     Ok(())
@@ -362,8 +369,32 @@ fn build_mail_message(header: &HeaderSnapshot, primary_domain: Option<String>) -
     }
 }
 
-async fn write_mail_messages(
+async fn persist_batch(
     pool: &sqlx_postgres::PgPool,
+    tenant_id: &str,
+    account_id: &str,
+    mailbox: &str,
+    collected_at: DateTime<Utc>,
+    config: &DomainsConfig,
+    messages: &[MailMessage],
+) -> Result<()> {
+    let mut tx = pool.begin().await?;
+    write_domains_config_in_transaction(&mut tx, tenant_id, config).await?;
+    write_mail_messages(
+        &mut tx,
+        tenant_id,
+        account_id,
+        mailbox,
+        collected_at,
+        messages,
+    )
+    .await?;
+    tx.commit().await.context("commit collector batch")?;
+    Ok(())
+}
+
+async fn write_mail_messages(
+    connection: &mut sqlx_postgres::PgConnection,
     tenant_id: &str,
     account_id: &str,
     mailbox: &str,
@@ -395,7 +426,7 @@ async fn write_mail_messages(
         domain = EXCLUDED.domain, \
         collected_at = EXCLUDED.collected_at",
     );
-    builder.build().execute(pool).await?;
+    builder.build().execute(connection).await?;
     Ok(())
 }
 
@@ -427,3 +458,7 @@ mod tests {
         assert!(format!("{err}").contains("OpenBao not configured"));
     }
 }
+
+#[cfg(test)]
+#[path = "batch_persistence_tests.rs"]
+mod batch_persistence_tests;
