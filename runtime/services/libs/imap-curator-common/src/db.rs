@@ -214,7 +214,20 @@ pub async fn write_domains_config(
     config: &DomainsConfig,
 ) -> Result<()> {
     let mut tx = pool.begin().await?;
+    write_domains_config_in_transaction(&mut tx, tenant_id, config).await?;
+    tx.commit().await.context("commit domains config")?;
+    Ok(())
+}
 
+/// Write domain observations and the collector cursor within the caller's batch transaction.
+///
+/// # Errors
+/// Returns a database error without committing the caller's transaction.
+pub async fn write_domains_config_in_transaction(
+    tx: &mut sqlx_core::transaction::Transaction<'_, sqlx_postgres::Postgres>,
+    tenant_id: &str,
+    config: &DomainsConfig,
+) -> Result<()> {
     sqlx_core::query::query(
         r#"
         INSERT INTO domain_defaults (tenant_id, id, auto_subscribe, move_limit_per_run, collect_batch_size, exclude_domains)
@@ -231,7 +244,7 @@ pub async fn write_domains_config(
     .bind(config.defaults.move_limit_per_run as i32)
     .bind(config.defaults.collect_batch_size as i32)
     .bind(&config.defaults.exclude_domains)
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await?;
 
     for (account_id, account) in &config.accounts {
@@ -248,7 +261,7 @@ pub async fn write_domains_config(
         .bind(account_id)
         .bind(&account.mailbox)
         .bind(account.collector_state.last_uid_processed as i32)
-        .execute(&mut *tx)
+        .execute(&mut **tx)
         .await?;
 
         for (domain, entry) in &account.domains {
@@ -273,12 +286,11 @@ pub async fn write_domains_config(
             .bind(entry.discovered.first_seen)
             .bind(entry.discovered.last_seen)
             .bind(entry.discovered.count_estimate as i64)
-            .execute(&mut *tx)
+            .execute(&mut **tx)
             .await?;
         }
     }
 
-    tx.commit().await.context("commit domains config")?;
     Ok(())
 }
 

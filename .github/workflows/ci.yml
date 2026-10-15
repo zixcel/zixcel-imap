@@ -52,6 +52,8 @@ jobs:
         run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
       - name: Test all runtime packages
         run: cargo test --locked --workspace --all-features
+      - name: Verify atomic collector failure, restart and retry boundaries
+        run: cargo test --locked -p imap-curator-collector batch_persistence_contract -- --ignored
       - name: Verify disposable database migrations and tenant foreign keys
         run: cargo run --locked -p db --example verify_postgres
       - name: Build all runtime packages

@@ -20,3 +20,6 @@ sqlx-postgres = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
+
+[dev-dependencies]
+url = "2.5.8"
