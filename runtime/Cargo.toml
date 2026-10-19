@@ -18,7 +18,7 @@ license = "MIT"
 
 [workspace.dependencies]
 anyhow = "1.0.86"
-axum = "0.7.9"
+axum = "0.8.9"
 chrono = { version = "0.4.38", default-features = false, features = ["clock", "serde"] }
 clap = { version = "4.5.21", features = ["derive", "env"] }
 http = "1.1.0"
