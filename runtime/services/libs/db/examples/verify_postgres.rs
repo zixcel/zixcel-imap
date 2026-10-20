@@ -109,7 +109,11 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn expect_database_code(pool: &sqlx_postgres::PgPool, sql: &str, code: &str) -> Result<()> {
+async fn expect_database_code(
+    pool: &sqlx_postgres::PgPool,
+    sql: &'static str,
+    code: &str,
+) -> Result<()> {
     let result = query(sql).execute(pool).await;
     ensure!(
         result.is_err_and(|error| matches!(error,

@@ -1,6 +1,6 @@
 //! Fetch only configured HTTPS provider metadata through the shared bounded transport.
 use anyhow::{Result, ensure};
-use oauth2::{HttpRequest, http};
+use oauth2::http;
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -16,14 +16,8 @@ pub(super) struct Metadata {
 }
 
 pub(super) fn https(value: &str) -> Result<oauth2::AuthUrl> {
+    oauth_transport::validate_endpoint(value)?;
     let url = oauth2::AuthUrl::new(value.to_owned())?;
-    ensure!(
-        url.url().scheme() == "https"
-            && url.url().username().is_empty()
-            && url.url().password().is_none()
-            && url.url().fragment().is_none(),
-        "invalid OIDC HTTPS URL"
-    );
     Ok(url)
 }
 
@@ -33,19 +27,17 @@ async fn fetch<T: serde::de::DeserializeOwned>(value: &str) -> Result<T> {
         http::header::ACCEPT,
         http::HeaderValue::from_static("application/json"),
     );
-    let response = oauth_transport::async_http_client(HttpRequest {
-        url: https(value)?.url().clone(),
-        method: http::Method::GET,
-        headers,
-        body: Vec::new(),
-    })
-    .await?;
+    let mut request = oauth2::http::Request::builder()
+        .uri(https(value)?.url().as_str())
+        .body(Vec::new())?;
+    *request.headers_mut() = headers;
+    let response = oauth_transport::async_http_client(request).await?;
     ensure!(
-        response.status_code == http::StatusCode::OK,
+        response.status() == http::StatusCode::OK,
         "OIDC metadata request failed"
     );
     let media_type = response
-        .headers
+        .headers()
         .get(http::header::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
         .and_then(|v| v.split(';').next())
@@ -54,7 +46,7 @@ async fn fetch<T: serde::de::DeserializeOwned>(value: &str) -> Result<T> {
         media_type.eq_ignore_ascii_case("application/json"),
         "invalid OIDC metadata content type"
     );
-    serde_json::from_slice(&response.body).map_err(|_| anyhow::anyhow!("invalid OIDC metadata"))
+    serde_json::from_slice(response.body()).map_err(|_| anyhow::anyhow!("invalid OIDC metadata"))
 }
 
 pub(super) fn validate(metadata: &Metadata, issuer: &str) -> Result<()> {

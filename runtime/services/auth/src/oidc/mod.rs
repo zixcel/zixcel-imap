@@ -22,13 +22,17 @@ impl OidcClient {
     ) -> Result<Self> {
         let metadata = discovery::discover(&issuer).await?;
         let keys = discovery::fetch_keys(&metadata.jwks_uri).await?;
-        let oauth = types::OAuthClient::new(
+        let oauth = types::OAuthClient::<oauth2::EndpointNotSet, oauth2::EndpointNotSet>::new(
             ClientId::new(id.clone()),
-            secret.map(ClientSecret::new),
-            AuthUrl::new(metadata.authorization_endpoint)?,
-            Some(TokenUrl::new(metadata.token_endpoint)?),
         )
+        .set_auth_uri(AuthUrl::new(metadata.authorization_endpoint)?)
+        .set_token_uri(TokenUrl::new(metadata.token_endpoint)?)
         .set_redirect_uri(RedirectUrl::new(redirect).context("invalid redirect URL")?);
+        let oauth = if let Some(secret) = secret {
+            oauth.set_client_secret(ClientSecret::new(secret))
+        } else {
+            oauth
+        };
         Ok(Self {
             oauth,
             issuer,
@@ -66,12 +70,11 @@ impl OidcClient {
 #[cfg(test)]
 pub(crate) fn browser_test_client() -> OidcClient {
     OidcClient {
-        oauth: types::OAuthClient::new(
+        oauth: types::OAuthClient::<oauth2::EndpointNotSet, oauth2::EndpointNotSet>::new(
             oauth2::ClientId::new("fixture-client".into()),
-            None,
-            oauth2::AuthUrl::new("https://example.invalid/authorize".into()).unwrap(),
-            None,
-        ),
+        )
+        .set_auth_uri(oauth2::AuthUrl::new("https://example.invalid/authorize".into()).unwrap())
+        .set_token_uri(oauth2::TokenUrl::new("https://example.invalid/token".into()).unwrap()),
         issuer: "https://example.invalid".into(),
         client_id: "fixture-client".into(),
         keys: Vec::new(),

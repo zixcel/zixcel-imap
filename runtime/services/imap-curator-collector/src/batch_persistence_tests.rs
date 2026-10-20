@@ -28,7 +28,15 @@ async fn batch_persistence_contract() -> Result<()> {
         .max_connections(1)
         .connect(&database_url)
         .await?;
-    query(&format!("CREATE SCHEMA {schema}"))
+    anyhow::ensure!(
+        schema
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'),
+        "invalid generated schema identifier"
+    );
+    sqlx_core::query_builder::QueryBuilder::<Postgres>::new("CREATE SCHEMA ")
+        .push(&schema)
+        .build()
         .execute(&admin)
         .await?;
     let path = schema.clone();
@@ -188,7 +196,10 @@ async fn batch_persistence_contract() -> Result<()> {
     .await?;
     assert_eq!(other, 0);
     pool.close().await;
-    query(&format!("DROP SCHEMA {schema} CASCADE"))
+    sqlx_core::query_builder::QueryBuilder::<Postgres>::new("DROP SCHEMA ")
+        .push(&schema)
+        .push(" CASCADE")
+        .build()
         .execute(&admin)
         .await?;
     admin.close().await;

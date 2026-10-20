@@ -297,7 +297,7 @@ async fn oidc_callback(
         .oauth
         .exchange_code(AuthorizationCode::new(code.clone()))
         .set_pkce_verifier(pending.pkce_verifier)
-        .request_async(async_http_client)
+        .request_async(&async_http_client)
         .await
         .map_err(|_| api_error(StatusCode::BAD_REQUEST, "token exchange failed"))?;
     let id_token = token_response

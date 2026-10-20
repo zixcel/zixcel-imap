@@ -99,7 +99,9 @@ impl sqlx_core::migrate::MigrationSource<'static> for EmbeddedMigrations {
                 1,
                 Cow::Borrowed("development baseline"),
                 MigrationType::Simple,
-                Cow::Borrowed(include_str!("../migrations/0001_development_baseline.sql")),
+                sqlx_core::sql_str::SqlStr::from_static(include_str!(
+                    "../migrations/0001_development_baseline.sql"
+                )),
                 false,
             )])
         })
