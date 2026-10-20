@@ -18,7 +18,7 @@ license = "MIT"
 
 [workspace.dependencies]
 anyhow = "1.0.86"
-axum = "0.7.9"
+axum = "0.8.9"
 chrono = { version = "0.4.38", default-features = false, features = ["clock", "serde"] }
 clap = { version = "4.5.21", features = ["derive", "env"] }
 http = "1.1.0"
@@ -41,8 +41,8 @@ tower-http = { version = "0.6.11", features = ["cors", "trace"] }
 tracing = "0.1.40"
 tracing-opentelemetry = "0.34.0"
 tracing-subscriber = { version = "0.3.18", features = ["fmt", "env-filter"] }
-utoipa = { version = "5.5.0", features = ["chrono"] }
-utoipa-swagger-ui = { version = "8.0.3", features = ["axum", "vendored"] }
+utoipa = { git = "https://github.com/juhaku/utoipa", rev = "5aff30b375c0c72aeccfa8fa6100db8f2901b3ba", features = ["chrono"] }
+utoipa-swagger-ui = { git = "https://github.com/juhaku/utoipa", rev = "5aff30b375c0c72aeccfa8fa6100db8f2901b3ba", features = ["axum", "vendored"] }
 uuid = { version = "1.10.0", features = ["v4"] }
 
 [profile.release]
