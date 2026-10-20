@@ -1,5 +1,7 @@
 //! Web and token refresh service for Checkback IMAP Curator configuration.
 
+mod routes;
+
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -10,7 +12,7 @@ use axum::extract::{Extension, Path as AxumPath, Query, State};
 use axum::http::{HeaderValue, Method, Request, StatusCode, header};
 use axum::middleware::{Next, from_fn_with_state};
 use axum::response::Response;
-use axum::routing::{delete, get, patch, post};
+use axum::routing::get;
 use axum::{Json, Router};
 use checkback_core::RequestContext;
 use checkback_core::audit::{AuditRecord, write_audit_log};
@@ -34,7 +36,6 @@ use tokio::time::sleep;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tracing::{info, warn};
 use utoipa::{IntoParams, OpenApi, ToSchema};
-use utoipa_swagger_ui::SwaggerUi;
 
 use crate::config::{Config, Mode};
 
@@ -111,6 +112,7 @@ struct DomainGroupNode {
     direct_count: u64,
     total_count: u64,
     entries: Vec<DomainSummary>,
+    #[schema(no_recursion)]
     children: Vec<DomainGroupNode>,
 }
 
@@ -200,6 +202,7 @@ struct MailDomainNode {
     direct_count: u64,
     total_count: u64,
     mails: Vec<MailSummary>,
+    #[schema(no_recursion)]
     children: Vec<MailDomainNode>,
 }
 
@@ -353,20 +356,7 @@ async fn run_web(
     };
 
     let cors = build_cors_layer(cors_origins)?;
-    let api = Router::new()
-        .route("/api/accounts", get(list_accounts))
-        .route("/api/domains", get(list_domains))
-        .route("/api/domains/tree", get(list_domain_groups))
-        .route("/api/domains/:account_id/:domain", patch(update_domain))
-        .route("/api/status", get(list_status))
-        .route("/api/mail", get(list_mail))
-        .route("/api/mail/domains", get(list_mail_domains))
-        .route("/api/sync-status", get(list_sync_status))
-        .route("/api/accounts/ms365/authorize", post(ms365_authorize))
-        .route("/api/accounts/icloud", post(icloud_upsert))
-        .route("/api/accounts/:account_id", delete(delete_account))
-        .merge(SwaggerUi::new("/api/docs").url("/api/openapi.json", ApiDoc::openapi()))
-        .layer(from_fn_with_state(state.clone(), require_session));
+    let api = routes::api().layer(from_fn_with_state(state.clone(), require_session));
 
     let app = Router::new()
         .merge(api)
