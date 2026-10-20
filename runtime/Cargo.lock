@@ -1229,7 +1229,7 @@ dependencies = [
  "oauth-transport",
  "oauth2",
  "observability",
- "rand 0.8.8",
+ "rand 0.10.3",
  "reqwest",
  "serde",
  "serde_json",
