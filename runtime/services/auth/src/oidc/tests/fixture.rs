@@ -19,12 +19,11 @@ pub(super) fn jwk() -> Value {
 }
 pub(super) fn client() -> OidcClient {
     OidcClient {
-        oauth: OAuthClient::new(
+        oauth: OAuthClient::<oauth2::EndpointNotSet, oauth2::EndpointNotSet>::new(
             oauth2::ClientId::new("fixture-client".into()),
-            None,
-            oauth2::AuthUrl::new("https://example.invalid/authorize".into()).unwrap(),
-            None,
-        ),
+        )
+        .set_auth_uri(oauth2::AuthUrl::new("https://example.invalid/authorize".into()).unwrap())
+        .set_token_uri(oauth2::TokenUrl::new("https://example.invalid/token".into()).unwrap()),
         issuer: "https://example.invalid".into(),
         client_id: "fixture-client".into(),
         keys: vec![jwk()],

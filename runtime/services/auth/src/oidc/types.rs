@@ -1,9 +1,9 @@
 //! Typed OAuth token fields and identity data; secrets are never included in errors.
+use oauth2::StandardRevocableToken;
 use oauth2::basic::{
     BasicErrorResponse, BasicRevocationErrorResponse, BasicTokenIntrospectionResponse,
     BasicTokenType,
 };
-use oauth2::revocation::StandardRevocableToken;
 use oauth2::{Client, StandardTokenResponse};
 use serde::{Deserialize, Serialize};
 
@@ -19,13 +19,17 @@ impl std::fmt::Debug for TokenFields {
             .finish()
     }
 }
-pub type OAuthClient = Client<
+pub type OAuthClient<A = oauth2::EndpointSet, T = oauth2::EndpointSet> = Client<
     BasicErrorResponse,
     StandardTokenResponse<TokenFields, BasicTokenType>,
-    BasicTokenType,
     BasicTokenIntrospectionResponse,
     StandardRevocableToken,
     BasicRevocationErrorResponse,
+    A,
+    oauth2::EndpointNotSet,
+    oauth2::EndpointNotSet,
+    oauth2::EndpointNotSet,
+    T,
 >;
 
 pub struct OidcClient {

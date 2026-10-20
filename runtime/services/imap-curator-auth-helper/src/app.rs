@@ -28,7 +28,7 @@ use oauth2::{
     AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope,
     TokenResponse, TokenUrl,
 };
-use rand::{Rng, distributions::Alphanumeric};
+use rand::{RngExt, distr::Alphanumeric};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sqlx_core::row::Row;
@@ -1318,7 +1318,7 @@ async fn ms365_authorize(
     Extension(ctx): Extension<RequestContext>,
     Json(form): Json<Ms365AuthorizeRequest>,
 ) -> ApiResult<Ms365AuthorizeResponse> {
-    let state_token: String = rand::thread_rng()
+    let state_token: String = rand::rng()
         .sample_iter(&Alphanumeric)
         .take(32)
         .map(char::from)
@@ -1408,7 +1408,7 @@ async fn ms365_callback(
 
     let token = client
         .exchange_code(AuthorizationCode::new(query.code))
-        .request_async(oauth_transport::async_http_client)
+        .request_async(&oauth_transport::async_http_client)
         .await
         .map_err(|err| {
             api_error(
@@ -1974,7 +1974,15 @@ fn build_oauth_client(
     client_id: &str,
     client_secret: &str,
     redirect_url: RedirectUrl,
-) -> Result<BasicClient> {
+) -> Result<
+    BasicClient<
+        oauth2::EndpointSet,
+        oauth2::EndpointNotSet,
+        oauth2::EndpointNotSet,
+        oauth2::EndpointNotSet,
+        oauth2::EndpointSet,
+    >,
+> {
     let auth_url = AuthUrl::new(format!(
         "https://login.microsoftonline.com/{}/oauth2/v2.0/authorize",
         tenant_id
@@ -1984,13 +1992,13 @@ fn build_oauth_client(
         tenant_id
     ))?;
 
-    let client = BasicClient::new(
-        ClientId::new(client_id.to_string()),
-        Some(ClientSecret::new(client_secret.to_string())),
-        auth_url,
-        Some(token_url),
-    )
-    .set_redirect_uri(redirect_url);
+    oauth_transport::validate_endpoint(auth_url.as_str())?;
+    oauth_transport::validate_endpoint(token_url.as_str())?;
+    let client = BasicClient::new(ClientId::new(client_id.to_string()))
+        .set_client_secret(ClientSecret::new(client_secret.to_string()))
+        .set_auth_uri(auth_url)
+        .set_token_uri(token_url)
+        .set_redirect_uri(redirect_url);
 
     Ok(client)
 }

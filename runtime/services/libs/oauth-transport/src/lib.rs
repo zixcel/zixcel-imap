@@ -20,10 +20,16 @@ fn limit(key: &str) -> Result<u64, TransportError> {
 }
 
 fn validate_url(request: &HttpRequest) -> Result<(), TransportError> {
-    if request.url.scheme() != "https"
-        || !request.url.username().is_empty()
-        || request.url.password().is_some()
-        || request.url.fragment().is_some()
+    validate_endpoint(&request.uri().to_string())
+}
+
+/// Validate the original endpoint before http::Uri discards URL fragments.
+pub fn validate_endpoint(value: &str) -> Result<(), TransportError> {
+    let url = reqwest::Url::parse(value).map_err(|_| TransportError)?;
+    if url.scheme() != "https"
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.fragment().is_some()
     {
         return Err(TransportError);
     }
@@ -39,12 +45,12 @@ pub async fn async_http_client(request: HttpRequest) -> Result<HttpResponse, Tra
         .timeout(Duration::from_millis(timeout))
         .build()
         .map_err(|_| TransportError)?;
-    let method = reqwest::Method::from_bytes(request.method.as_str().as_bytes())
+    let method = reqwest::Method::from_bytes(request.method().as_str().as_bytes())
         .map_err(|_| TransportError)?;
     let mut builder = client
-        .request(method, request.url.as_str())
-        .body(request.body);
-    for (key, value) in &request.headers {
+        .request(method, request.uri().to_string())
+        .body(request.body().clone());
+    for (key, value) in request.headers() {
         builder = builder.header(key.as_str(), value.as_bytes());
     }
     let mut response = builder.send().await.map_err(|_| TransportError)?;
@@ -71,33 +77,34 @@ pub async fn async_http_client(request: HttpRequest) -> Result<HttpResponse, Tra
         }
         body.extend_from_slice(&chunk);
     }
-    Ok(HttpResponse {
-        status_code,
-        headers,
-        body,
-    })
+    let mut response = HttpResponse::new(body);
+    *response.status_mut() = status_code;
+    *response.headers_mut() = headers;
+    Ok(response)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     fn request(url: &str) -> HttpRequest {
-        HttpRequest {
-            url: url.parse().unwrap(),
-            method: oauth2::http::Method::GET,
-            headers: oauth2::http::HeaderMap::new(),
-            body: Vec::new(),
-        }
+        oauth2::http::Request::builder()
+            .uri(url)
+            .body(Vec::new())
+            .unwrap()
     }
     #[test]
     fn rejects_non_https_and_url_credentials_without_network() {
         for url in [
             "http://example.invalid",
             "https://fixture:invalid@example.invalid",
-            "https://example.invalid/#fragment",
         ] {
             assert!(validate_url(&request(url)).is_err());
         }
         assert!(validate_url(&request("https://example.invalid/token")).is_ok());
+    }
+    #[test]
+    fn original_endpoint_rejects_fragments_before_http_uri_conversion() {
+        assert!(validate_endpoint("https://example.invalid/#fragment").is_err());
+        assert!(validate_endpoint("https://example.invalid/token").is_ok());
     }
 }
