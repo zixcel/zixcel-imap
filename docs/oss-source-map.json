@@ -1,15 +1,15 @@
 {
-  "repository": "zixcel/zixcel-imap",
+  "repository": "zixcel/zixcel-mail",
   "purpose": "Check a IMAP mail integration configuration and produce a plan before implementing or enabling the connection.",
   "responsibility_boundary": "Own the named reusable integration/data mechanism. Product roles/UI and operational approvals stay with consumers; transport/custody reuse managed Crowsi components where capabilities fit. Planning-only APIs must remain clearly distinguished from implemented external operations.",
   "packages": [
     {
-      "manifest": "Cargo.toml",
-      "package": "zixcel-imap",
+      "manifest": "crates/planning/Cargo.toml",
+      "package": "zixcel-mail-planning",
       "ecosystem": "rust",
       "description": "Planning-only IMAP connector boundary for Zixcel",
       "interfaces": {
-        "lib": "src/lib.rs",
+        "lib": "crates/planning/src/lib.rs",
         "features": {},
         "bins": [],
         "public_modules": [],
@@ -162,6 +162,62 @@
         "implicit_bins": []
       },
       "declared_commands": {}
+    },
+    {
+      "manifest": "Cargo.toml",
+      "package": "zixcel-mail",
+      "ecosystem": "rust",
+      "distribution": "source-only; publish=false",
+      "interfaces": {
+        "lib": "src/lib.rs",
+        "public_modules": [
+          "core",
+          "imap",
+          "smtp",
+          "message",
+          "planning"
+        ]
+      }
+    },
+    {
+      "manifest": "crates/mail-core/Cargo.toml",
+      "package": "zixcel-mail-core",
+      "ecosystem": "rust",
+      "distribution": "source-only; publish=false",
+      "interfaces": {
+        "lib": "crates/mail-core/src/lib.rs",
+        "public_modules": []
+      }
+    },
+    {
+      "manifest": "crates/imap-client/Cargo.toml",
+      "package": "zixcel-imap-client",
+      "ecosystem": "rust",
+      "distribution": "source-only; publish=false",
+      "interfaces": {
+        "lib": "crates/imap-client/src/lib.rs",
+        "public_modules": []
+      }
+    },
+    {
+      "manifest": "crates/smtp-client/Cargo.toml",
+      "package": "zixcel-smtp-client",
+      "ecosystem": "rust",
+      "distribution": "source-only; publish=false",
+      "interfaces": {
+        "lib": "crates/smtp-client/src/lib.rs",
+        "public_modules": []
+      }
+    },
+    {
+      "manifest": "crates/message/Cargo.toml",
+      "package": "zixcel-mail-message",
+      "ecosystem": "rust",
+      "distribution": "source-only; publish=false",
+      "interfaces": {
+        "lib": "crates/message/src/lib.rs",
+        "public_modules": []
+      }
     }
   ],
   "schema_definitions": [],
@@ -197,10 +253,10 @@
     "runtime/services/libs/imap-curator-common/src/imap_client.rs",
     "runtime/services/libs/oauth-transport/src/lib.rs",
     "runtime/services/libs/observability/src/lib.rs",
-    "src/boundary.rs",
-    "src/config_io.rs",
-    "src/unit_tests.rs",
-    "tests/connector.rs"
+    "crates/planning/src/boundary.rs",
+    "crates/planning/src/config_io.rs",
+    "crates/planning/src/unit_tests.rs",
+    "crates/planning/tests/connector.rs"
   ],
   "example_sources": [
     "examples/config.toml",
@@ -341,5 +397,6 @@
       ]
     }
   ],
-  "evidence_policy": "Declarations and source paths are not proof of an executed acceptance. Exact CI head and result are recorded separately. No live accounts or production acceptance is inferred."
+  "evidence_policy": "Declarations and source paths are not proof of an executed acceptance. Exact CI head and result are recorded separately. No live accounts or production acceptance is inferred.",
+  "description": "Provider-neutral bounded mail clients and optional curator runtime"
 }

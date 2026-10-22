@@ -1,4 +1,4 @@
-# Zixcel IMAP runtime
+# Zixcel Mail optional IMAP curator runtime
 
 Selected IMAP-curator logic is maintained here: collector, domain discovery,
 folder operator, account OAuth/session helper, auth session validation,
@@ -6,7 +6,7 @@ PostgreSQL schema and observability. The MIT LICENSE is retained. The unrelated
 profile/inventory MCP gateway, generated docs, old frontend/deployment, local
 credentials, Git copies and tool caches are not adopted.
 
-This is a separate Rust workspace. The root zixcel-imap crate remains a
+This is a separate Rust workspace. The separate zixcel-mail-planning crate remains a
 planning-only package. Every runtime package has `publish = false`.
 
 ## Configuration

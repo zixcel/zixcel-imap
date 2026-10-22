@@ -15,11 +15,20 @@ jobs:
         with:
           persist-credentials: false
       - name: Install declared Rust toolchain
-        run: rustup toolchain install 1.97 --profile minimal
+        run: rustup toolchain install 1.97.1 --profile minimal --component rustfmt --component clippy
       - name: Test default features
-        run: cargo +1.97 test --locked
+        run: cargo +1.97.1 test --locked --workspace --all-targets
       - name: Test all features
-        run: cargo +1.97 test --locked --all-features
+        run: cargo +1.97.1 test --locked --workspace --all-targets --all-features
+
+      - name: Verify client formatting
+        run: cargo +1.97.1 fmt --all --check
+      - name: Lint all mail clients
+        run: cargo +1.97.1 clippy --locked --workspace --all-targets --all-features -- -D warnings
+      - name: Audit client lockfile
+        run: |
+          cargo install cargo-audit --version 0.22.2 --locked --no-default-features
+          cargo audit --deny warnings
 
   runtime:
     runs-on: ubuntu-latest

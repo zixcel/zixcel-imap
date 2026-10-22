@@ -1,0 +1,15 @@
+[package]
+name = "zixcel-mail-message"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+description = "Bounded MIME message creation and decoding"
+
+[dependencies]
+zixcel-mail-core.workspace = true
+serde.workspace = true
+mail-builder = "1.0.0"
+mailparse = "0.18.0"

@@ -1,0 +1,16 @@
+[package]
+name = "zixcel-mail-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+description = "Validated mail endpoints, borrowed credential boundary and bounded TLS IO"
+
+[dependencies]
+serde.workspace = true
+zeroize.workspace = true
+tokio.workspace = true
+tokio-rustls.workspace = true
+webpki-roots.workspace = true

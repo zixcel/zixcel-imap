@@ -1,0 +1,20 @@
+[package]
+name = "zixcel-smtp-client"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+description = "Bounded explicit one-use SMTP submission client"
+
+[dependencies]
+zixcel-mail-core.workspace = true
+zixcel-mail-message.workspace = true
+tokio.workspace = true
+tokio-rustls.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+mail-send = { version = "0.6.2", default-features = false, features = ["ring", "tls12"] }
+libc = "0.2.187"

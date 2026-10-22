@@ -3,7 +3,7 @@ use std::process::ExitCode;
 
 use serde::Serialize;
 use serde_json::json;
-use zixcel_imap::{build_plan, capabilities, doctor, parse_config, validation_report};
+use zixcel_mail_planning::{build_plan, capabilities, doctor, parse_config, validation_report};
 
 fn main() -> ExitCode {
     match run() {
@@ -11,7 +11,7 @@ fn main() -> ExitCode {
         Err(message) => {
             let error = json!({
                 "schema": "zixcel://cli-error/v1",
-                "connector": zixcel_imap::CONNECTOR,
+                "connector": zixcel_mail_planning::CONNECTOR,
                 "status": "error",
                 "message": message
             });
@@ -80,5 +80,5 @@ fn print_json(value: &impl Serialize) -> Result<(), String> {
 }
 
 fn usage() -> String {
-    "usage: zixcel-imap <doctor|capabilities|validate <config>|plan <config>>".to_owned()
+    "usage: zixcel-mail-planning <doctor|capabilities|validate <config>|plan <config>>".to_owned()
 }
