@@ -16,7 +16,10 @@ pub struct Plan {
     expires_at: u64,
 }
 fn hash(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    Sha256::digest(bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 impl Plan {
     pub fn new(

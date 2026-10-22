@@ -74,7 +74,7 @@ pub async fn send_once(request: Submission<'_>) -> Result<Outcome> {
             approved_digest,
             now()?,
         )?;
-        let message = mail_send::Message::new(
+        let message = mail_send::smtp::message::Message::new(
             message.from(),
             message.to().iter().map(String::as_str),
             message.bytes(),
