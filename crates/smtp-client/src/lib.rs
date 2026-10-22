@@ -31,6 +31,12 @@ pub async fn check_with_trust(
     tokio::time::timeout(OPERATION_TIMEOUT, async {
         let mut client = connection::connect_with_trust(endpoint, credentials, trust).await?;
         client.noop().await.map_err(|_| Error("smtp_noop_failed"))?;
+        use tokio::io::AsyncWriteExt;
+        client
+            .stream
+            .shutdown()
+            .await
+            .map_err(|_| Error("smtp_disconnect_failed"))?;
         Ok(())
     })
     .await

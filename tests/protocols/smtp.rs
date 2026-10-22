@@ -80,6 +80,8 @@ async fn accepted_and_ambiguous_sends_are_permanently_non_replayable() {
         .unwrap();
         let digest = plan.digest().unwrap();
         let journal = tempfile::tempdir().unwrap();
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(journal.path(), std::fs::Permissions::from_mode(0o700)).unwrap();
         let request = || Submission {
             endpoint: &endpoint,
             credentials: &credentials,

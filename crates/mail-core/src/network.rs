@@ -45,9 +45,13 @@ impl TlsTrust {
 }
 pub async fn connect(endpoint: &Endpoint) -> Result<Bounded<TcpStream>> {
     endpoint.validate()?;
-    let stream = TcpStream::connect((endpoint.host.as_str(), endpoint.port))
-        .await
-        .map_err(|_| Error("tcp_connection_failed"))?;
+    let stream = tokio::time::timeout(
+        crate::OPERATION_TIMEOUT,
+        TcpStream::connect((endpoint.host.as_str(), endpoint.port)),
+    )
+    .await
+    .map_err(|_| Error("tcp_connection_timeout"))?
+    .map_err(|_| Error("tcp_connection_failed"))?;
     Ok(Bounded::new(stream, MAX_WIRE))
 }
 pub async fn tls<S: AsyncRead + AsyncWrite + Unpin>(
@@ -62,9 +66,10 @@ pub async fn tls_with_trust<S: AsyncRead + AsyncWrite + Unpin>(
     trust: &TlsTrust,
 ) -> Result<Bounded<TlsStream<S>>> {
     let name = ServerName::try_from(host.to_owned()).map_err(|_| Error("invalid_tls_name"))?;
-    let stream = TlsConnector::from(trust.config.clone())
-        .connect(name, stream)
+    let connector = TlsConnector::from(trust.config.clone());
+    let stream = tokio::time::timeout(crate::OPERATION_TIMEOUT, connector.connect(name, stream))
         .await
+        .map_err(|_| Error("tls_handshake_timeout"))?
         .map_err(|_| Error("tls_verification_failed"))?;
     Ok(Bounded::new(stream, MAX_WIRE))
 }
