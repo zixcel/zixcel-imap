@@ -91,7 +91,9 @@ async fn accepted_and_ambiguous_sends_are_permanently_non_replayable() {
             journal: journal.path(),
             trust: &trust,
         };
-        let outcome = smtp::send_once(request()).await.unwrap();
+        let receipt = smtp::send_once(request()).await.unwrap();
+        let outcome = receipt.outcome;
+        assert_eq!(receipt.reason.is_none(), acknowledge);
         assert_eq!(
             outcome,
             if acknowledge {
