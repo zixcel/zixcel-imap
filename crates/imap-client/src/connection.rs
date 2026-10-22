@@ -21,7 +21,7 @@ pub(super) async fn login(
 struct OAuth<'a>(&'a Credentials);
 impl async_imap::Authenticator for OAuth<'_> {
     type Response = String;
-    fn process(&self, _: &[u8]) -> String {
+    fn process(&mut self, _: &[u8]) -> String {
         format!(
             "user={}\x01auth=Bearer {}\x01\x01",
             self.0.user(),

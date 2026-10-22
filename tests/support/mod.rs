@@ -46,7 +46,11 @@ impl Fixture {
         listener: TcpListener,
         config: Arc<ServerConfig>,
     ) -> BufReader<TlsStream<TcpStream>> {
-        let (stream, _) = listener.accept().await.unwrap();
+        let (stream, _) =
+            tokio::time::timeout(std::time::Duration::from_secs(5), listener.accept())
+                .await
+                .unwrap()
+                .unwrap();
         BufReader::new(TlsAcceptor::from(config).accept(stream).await.unwrap())
     }
 }
@@ -60,7 +64,13 @@ pub fn credential() -> Credentials {
 }
 pub async fn line<S: AsyncRead + AsyncWrite + Unpin>(stream: &mut BufReader<S>) -> String {
     let mut line = String::new();
-    stream.read_line(&mut line).await.unwrap();
+    tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        stream.read_line(&mut line),
+    )
+    .await
+    .unwrap()
+    .unwrap();
     assert!(line.len() <= 8192);
     line
 }
