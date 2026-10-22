@@ -1,4 +1,4 @@
-use zixcel_imap::{build_plan, doctor, parse_config};
+use zixcel_mail_planning::{build_plan, doctor, parse_config};
 
 const CONFIG: &str = r#"
 schema = "zixcel://imap/config/v1"

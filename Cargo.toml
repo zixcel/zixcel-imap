@@ -1,31 +1,48 @@
-[package]
-exclude = ["*.tgz", "**/*.tgz", "/registration/**", "/state/**", "/.local/**", "/.state/**", "/.data/**", "/secrets/**", "/credentials/**", "/.env", "/.env.production", "/.env.local", "/*.tgz", "/*.tar.gz", "/*.tar", "/*.zip", "/*.whl", "/*.crate", "/.ruff_cache/**", "/.mypy_cache/**", "/.tox/**", "/.nox/**", "/.hypothesis/**", "/.coverage", "/.coverage.*", "/htmlcov/**", "/lcov.info", "/junit.xml", "/*.profraw", "/*.profdata", "/*.egg-info/**", "/target/**", "/node_modules/**", "/dist/**", "/build/**", "/.cache/**", "/.pytest_cache/**", "/coverage/**"]
-name = "zixcel-imap"
-version = "0.1.0"
+[workspace]
+resolver = "3"
+members = [".", "crates/mail-core", "crates/imap-client", "crates/smtp-client", "crates/message", "crates/planning"]
+exclude = ["runtime"]
+
+[workspace.package]
 edition = "2024"
 rust-version = "1.97"
-description = "Planning-only IMAP connector boundary for Zixcel"
 license = "Apache-2.0"
-readme = "README.md"
-publish = false
+repository = "https://github.com/zixcel/zixcel-mail"
 
-[package.metadata.zixcel]
-boundary = "planning-only"
-external-actions = false
-
-[workspace]
-members = ["."]
-resolver = "3"
-
-[dependencies]
-libc = "0.2.187"
+[workspace.dependencies]
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
 sha2 = "0.11.0"
-toml = "1.1.8"
+zeroize = "1.9.1"
+tokio = { version = "1.52", features = ["rt", "macros", "net", "time", "io-util"] }
+tokio-rustls = { version = "0.26.6", default-features = false, features = ["ring", "tls12"] }
+webpki-roots = "1.0.10"
+zixcel-mail-core = { path = "crates/mail-core" }
+zixcel-imap-client = { path = "crates/imap-client" }
+zixcel-smtp-client = { path = "crates/smtp-client" }
+zixcel-mail-message = { path = "crates/message" }
+zixcel-mail-planning = { path = "crates/planning" }
 
-[lints.rust]
-unsafe_code = "forbid"
+[package]
+name = "zixcel-mail"
+version = "0.2.0"
+edition.workspace = true
+rust-version.workspace = true
+license = "Apache-2.0"
+repository.workspace = true
+publish = false
+description = "Provider-neutral bounded IMAP, SMTP submission and MIME mail clients"
 
-[lints.clippy]
-all = "warn"
+[dependencies]
+zixcel-mail-core.workspace = true
+zixcel-imap-client.workspace = true
+zixcel-smtp-client.workspace = true
+zixcel-mail-message.workspace = true
+zixcel-mail-planning.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "sync"] }
+tokio-rustls.workspace = true
+rcgen = "0.14.8"
+tempfile = "3"

@@ -1,4 +1,4 @@
-# OSS source contract: zixcel/zixcel-imap
+# OSS source contract: zixcel/zixcel-mail
 
 Check a IMAP mail integration configuration and produce a plan before implementing or enabling the connection.
 
@@ -12,7 +12,7 @@ Same-function managed packages take priority when their actual capabilities fit.
 
 | Manifest | Package | Distribution policy |
 | --- | --- | --- |
-| `Cargo.toml` | `zixcel-imap` | source-only; publish=false |
+| `crates/planning/Cargo.toml` | `zixcel-mail-planning` | source-only; publish=false |
 | `runtime/services/auth/Cargo.toml` | `auth` | source-only; publish=false |
 | `runtime/services/imap-curator-auth-helper/Cargo.toml` | `imap-curator-auth-helper` | source-only; publish=false |
 | `runtime/services/imap-curator-collector/Cargo.toml` | `imap-curator-collector` | source-only; publish=false |
@@ -55,7 +55,7 @@ a filename or schema declaration does not grant product or cloud authority.
 
 | Package | Canonical manifest | Responsibility/interface |
 | --- | --- | --- |
-| `zixcel-imap` | [Cargo.toml](../Cargo.toml) | Planning-only IMAP connector boundary for Zixcel |
+| `zixcel-mail-planning` | [crates/planning/Cargo.toml](../crates/planning/Cargo.toml) | Planning-only IMAP connector boundary for Zixcel |
 | `auth` | [runtime/services/auth/Cargo.toml](../runtime/services/auth/Cargo.toml) | Declared Rust public modules/reexports and binary targets |
 | `imap-curator-auth-helper` | [runtime/services/imap-curator-auth-helper/Cargo.toml](../runtime/services/imap-curator-auth-helper/Cargo.toml) | Declared Rust public modules/reexports and binary targets |
 | `imap-curator-collector` | [runtime/services/imap-curator-collector/Cargo.toml](../runtime/services/imap-curator-collector/Cargo.toml) | Declared Rust public modules/reexports and binary targets |
@@ -78,3 +78,11 @@ Schema definitions in the map remain owned by their canonical validator and
 consumers. An absent schema file means no separate schema file is declared; it does
 not mean the runtime interface has no validation. Do not introduce another common
 schema solely to mirror an implementation type.
+
+## Mail client workspace
+
+The root `zixcel-mail` facade owns the source-only `mail-core`, `imap-client`,
+`smtp-client` and `message` crates. See the root README for exact operations,
+resource limits and unsupported capabilities. They do not depend on the optional
+PostgreSQL runtime. New SMTP effects require host-owned approval and a durable
+one-use journal; synthetic acceptance is not actual delivery.

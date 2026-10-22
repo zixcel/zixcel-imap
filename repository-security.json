@@ -1,6 +1,6 @@
 {
   "schema": "zixcel://repository-security/policy/v1",
-  "repository_id": "zixcel-imap",
+  "repository_id": "zixcel-mail",
   "scope": "source-secret-disclosure/v1",
   "required_engines": [
     "builtin-disclosure",

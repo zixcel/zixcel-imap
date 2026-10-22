@@ -1,39 +1,75 @@
-# zixcel-imap
+# Zixcel Mail
 
-Check a IMAP mail integration configuration and produce a plan before implementing or enabling the connection.
+Provider-neutral Rust mail clients, message handling and bounded execution contracts.
+The canonical repository is https://github.com/zixcel/zixcel-mail.
 
-## What you can do
+| Package | Responsibility |
+| --- | --- |
+| `zixcel-mail` | Facade reexporting `core`, `imap`, `smtp`, `message`, `planning` |
+| `zixcel-mail-core` | Explicit endpoints, credentials supplied by owner, TLS/CA verification and wire limits |
+| `zixcel-imap-client` | Verified implicit TLS, password/XOAUTH2, read-only EXAMINE, UIDVALIDITY-bound header reads |
+| `zixcel-smtp-client` | Verified implicit TLS or required STARTTLS, authentication/NOOP, explicit one-use SMTP submission |
+| `zixcel-mail-message` | MIME text-message composition and bounded header decoding |
+| `zixcel-mail-planning` | Former planning-only IMAP configuration/plan CLI; it does not connect |
+| `runtime/` | Separately licensed optional collector/operator and web-session services; independent PostgreSQL workspace |
 
-- Validate the declared integration settings.
-- Inspect a bounded plan and missing prerequisites.
+The client workspace requires no database, daemon, tenant-wide administration,
+PowerShell, Microsoft SDK or central repository. Microsoft-specific authorization
+and mailbox management stay in `zixcel-microsoft`; credential custody stays with
+Crowsi/the calling host. No OAuth app or secret store is created here.
 
-## Current scope
+## Library usage
 
-The current package validates configuration and plans operations. It does not provide a complete live service client.
-
-Package distribution is not activated by this documentation. Use the checked-in source and the declared dependency versions; published availability must be verified separately.
-
-## Getting started
-
-Install Rust 1.97 or newer. Dependencies resolve from crates.io. Run from this repository:
-
-```sh
-cargo test --locked
+```rust,no_run
+use zixcel_mail::{core::{Auth, Credentials, Endpoint, TlsMode}, imap::Client};
+# async fn example() -> Result<(), Box<dyn std::error::Error>> {
+let endpoint = Endpoint { host: "imap.example.org".into(), port: 993, tls: TlsMode::Implicit };
+let credentials = Credentials::new("user@example.org".into(), "synthetic-token".into(), Auth::Xoauth2)?;
+let mut client = Client::connect(&endpoint, &credentials).await?;
+let mailbox = client.examine("INBOX").await?;
+client.logout().await?;
+# Ok(()) }
 ```
 
-## Documentation and source
+No example contains usable credentials. Hosts resolve actual credentials through
+custody. Do not put credentials in arguments, configuration files or logs.
 
-[Usage guide](docs/getting-started.md)
+## Supported boundaries
 
-[Examples](examples) · [Implementation and public interfaces](src) · [Verification cases](tests) · [Contributing](CONTRIBUTING.md) · [Security reporting](SECURITY.md) · [License](LICENSE) · [Attribution notices](NOTICE)
+- Read-only IMAP uses EXAMINE and BODY.PEEK, pins UIDVALIDITY and exact requested UIDs,
+  and rejects missing, duplicate, truncated or oversized observations.
+- SMTP auth occurs only after certificate-verified TLS. STARTTLS never falls back
+  to plaintext. The server's pre-TLS capabilities are discarded.
+- SMTP plans bind endpoint, account, recipients, prepared message bytes, request ID
+  and expiry. The host owns human approval; a hash or custody unlock alone grants
+  no authority. Durable attempt markers prevent replay after restart. No retries.
+- SMTP acceptance is not proof of delivery. Ambiguous outcomes must be reconciled
+  independently; do not remove attempt markers to resend.
+- Every operation has a 30-second timeout, IMAP sessions a 120-second lifetime,
+  and streams a 2 MiB wire ceiling. MIME input/encoded messages are bounded.
+- Private enterprise CAs are an explicit caller trust decision; there is no
+  disable-verification switch. Production trust enrollment is outside the library.
 
-## IMAP collection and organization runtime
+This first client API does not implement POP3, a mail server/MTA, DKIM key management,
+attachment extraction, arbitrary IMAP commands, or a native zix mail extension.
+Existing curator folder changes remain in the optional runtime and are not
+implicitly executed by the client facade. MIME summaries are untrusted content,
+not executable LLM instructions; no HTML rendering or automatic URL fetching occurs.
 
-The adopted [runtime](runtime/README.md) workspace owns the MIT-licensed
-collector, operator, account OAuth/session helpers, PostgreSQL migrations and
-telemetry. It is separate from the planning-only root crate and is unpublished.
-The connector runtime is not enabled automatically.
+All crates currently use `publish=false`; source availability does not imply a
+crates.io package or downloadable native CLI. No live account compatibility or
+actual delivery is claimed by synthetic tests.
 
-[OSS responsibility and source completion](docs/oss-source-contract.md) defines the supported package boundary and required acceptance. It does not declare unexecuted source, distribution or production checks complete.
+## Development
 
-Dependency updates: [repository policy](docs/dependency-updates.md).
+Heavy tests run in owner CI. Use a bounded disposable environment for local tests:
+
+```sh
+cargo test --locked --workspace --all-targets --all-features
+cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+cargo fmt --all --check
+```
+
+The [optional runtime](runtime/README.md) has its own lockfile, MIT notice,
+PostgreSQL fixtures and CI job. Those services are not started by client tests.
+[Usage](docs/getting-started.md) · [License](LICENSE) · [Notices](NOTICE) · [Security](SECURITY.md)
